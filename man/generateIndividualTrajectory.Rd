@@ -38,7 +38,7 @@ The data generating process says the distribution on the difference between the 
 an nx4 matrix. The generated cubic functions with each row corresponding to the coefficients.
 }
 \description{
-Generate Individual Cubic Trajectories
+A helper function to randomly generate cubic spline trajectory functions.
 }
 \examples{
 

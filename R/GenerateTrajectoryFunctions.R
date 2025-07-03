@@ -1,4 +1,8 @@
 #' Generate Individual Cubic Trajectories
+#' 
+#' @description
+#' A helper function to randomly generate cubic spline trajectory functions.
+#' 
 #'
 #' @param startTime a numeric scalar. The center time for the generating cubic function.
 #' @param endTime a numeric scalar. The ending time for the generating cubic function. 
@@ -72,6 +76,10 @@ generateIndividualTrajectory = function(startTime, endTime, prevTraj, prevStartT
 
 
 #' Generate Full Trajectory Function
+#' 
+#' @description
+#' A function to randomly generate full cubic spline trajectory functions. 
+#' 
 #'
 #' @param TimeSplits a numeric vector. The spline node locations with the starting and ending times. 
 #' @param numModels a numeric scalar. The number of trajectories to generate.

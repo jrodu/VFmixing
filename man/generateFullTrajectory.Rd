@@ -22,7 +22,7 @@ This is the equivalent of endSD in generateIndividualTrajectory function.}
 a list. Each element is a coefficient matrix corresponding to a segment of the spline.
 }
 \description{
-Generate Full Trajectory Function
+A function to randomly generate full cubic spline trajectory functions.
 }
 \examples{
 
