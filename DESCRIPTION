@@ -11,5 +11,7 @@ RoxygenNote: 7.3.2
 Imports: 
     ggplot2,
     MASS,
+    RcppArmadillo,
     stats,
-    stringr
+    stringr,
+    svMisc
