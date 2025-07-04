@@ -118,7 +118,7 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
       }
       
       post_len = length(all_splits_est_path)
-      progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
+      svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
       
       if(post_len == pre_len){
         break

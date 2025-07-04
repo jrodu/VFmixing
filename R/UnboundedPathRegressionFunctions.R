@@ -55,6 +55,124 @@ constructUnboundedCubicSplineModelMatrix_Path = function(Data, time_splits, spli
   
 }
 
+#' constructUnboundedCubicSplineTransitionMatrix_Path
+#' 
+#' @description
+#' Construct the matrix to transform the free parameters of the cubic spline into the full set of parameters.
+#' 
+#'
+#' @param time_splits a numeric vector. The nodes of the spline with the starting and ending times. 
+#' @param V_Smooth a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.
+#'
+#' @returns a numeric matrix.
+#' @export
+#'
+constructUnboundedCubicSplineTransitionMatrix_Path = function(time_splits, V_Smooth = T){
+  
+  if(V_Smooth){
+    
+    trans_mat = matrix(c(1,rep(0,length(time_splits)+1),
+                         0,1,rep(0,length(time_splits)),
+                         0,0,1,rep(0,length(time_splits)-1),
+                         0,0,0,1,rep(0,length(time_splits)-2)), byrow = T, nrow = 4)
+    
+    creation_Func = function(i){
+      if(i%%4 == 1){
+        
+        cur_row = c(rep(0,4 + (i-5)/4),1,rep(0,length(time_splits) - 3 - (i-5)/4))
+        
+      } else if(i%%4 == 2){
+        
+        sub_time_splits = time_splits[2:((i+2)/4)]
+        
+        v_init = c(3*diff(time_splits)[1],1,0,0)
+        
+        v1 = 3*diff(sub_time_splits)
+        
+        cur_row = c(v_init, v1, rep(0,length(time_splits) - (i+2)/4))
+        
+      } else if(i%%4 == 3){
+        
+        sub_time_splits = time_splits[2:((i+1)/4)]
+        
+        v_init = c(3*diff(time_splits)[1]^2 + 6*diff(time_splits)[1]*(time_splits[(i+1)/4] - time_splits[2]),
+                   2*(time_splits[(i+1)/4] - time_splits[1]),
+                   1,
+                   0)
+        
+        v1 = 3*diff(sub_time_splits)^2 + 6*diff(sub_time_splits)*(time_splits[(i+1)/4] - sub_time_splits[-1])
+        
+        cur_row = c(v_init, v1, rep(0,length(time_splits) - (i+1)/4))
+        
+      }else if(i%%4 == 0){
+        
+        sub_time_splits = time_splits[2:(i/4)]
+        
+        v_init = c(diff(time_splits)[1]^3 + 3*diff(time_splits)[1]*(time_splits[i/4] - time_splits[2])*(time_splits[i/4] - time_splits[1]), 
+                   (time_splits[i/4]-time_splits[1])^2,
+                   time_splits[i/4]-time_splits[1],
+                   1)
+        
+        v1 = diff(sub_time_splits)^3 + 3*diff(sub_time_splits)^2*(time_splits[i/4] - sub_time_splits[-1]) + 3*diff(sub_time_splits)*(time_splits[i/4] - sub_time_splits[-1])^2
+        
+        cur_row = c(v_init, v1,rep(0,length(time_splits) - i/4))
+      }
+      
+      cur_row
+    }
+    
+    trans_mat = rbind(trans_mat, t(apply(matrix(5:(4*(length(time_splits)-1))), MARGIN = 1, FUN = creation_Func, simplify = T)))
+    
+  } else{
+    
+    trans_mat = matrix(c(1,rep(0,2*length(time_splits)-1),
+                         0,1,rep(0,2*length(time_splits)-2),
+                         0,0,1,rep(0,2*length(time_splits)-3),
+                         0,0,0,1,rep(0,2*length(time_splits)-4)), byrow = T, nrow = 4)
+    
+    creation_Func = function(i){
+      
+      if(i%%4 == 1){
+        cur_row = c(rep(0,(i+3)/2),1,rep(0,2*length(time_splits) - ((i+3)/2) - 1))
+      } else if(i%%4 == 2){
+        cur_row = c(rep(0, (i+4)/2),1,rep(0,2*length(time_splits) - ((i+4)/2) - 1))
+      } else if(i%%4 == 3){
+        
+        sub_time_splits = time_splits[2:((i+1)/4)]
+        
+        v_init = c(3*diff(time_splits)[1]^2,2*diff(time_splits)[1],1,0)
+        
+        v1 = 3*diff(sub_time_splits)^2
+        v2 = 2*diff(sub_time_splits)
+        
+        cur_row = c(v_init, c(rbind(v1,v2)),rep(0,2*length(time_splits) - 4 - 2*(length(sub_time_splits)-1)))
+        
+      }else if(i%%4 == 0){
+        
+        sub_time_splits = time_splits[2:(i/4)]
+        
+        v_init = c(diff(time_splits)[1]^3 + 3*diff(time_splits)[1]^2*(time_splits[i/4] - time_splits[2]), 
+                   diff(time_splits)[1]^2 + 2*diff(time_splits)[1]*(time_splits[i/4] - time_splits[2]),
+                   time_splits[i/4]-time_splits[1],
+                   1)
+        
+        v1 = diff(sub_time_splits)^3 + 3*diff(sub_time_splits)^2*(time_splits[i/4] - sub_time_splits[-1])
+        v2 = diff(sub_time_splits)^2 + 2*diff(sub_time_splits)*(time_splits[i/4] - sub_time_splits[-1])
+        
+        cur_row = c(v_init, c(rbind(v1,v2)),rep(0,2*length(time_splits) - 4 - 2*(length(sub_time_splits)-1)))
+      }
+      
+      cur_row
+      
+    }
+    
+    trans_mat = rbind(trans_mat, t(apply(matrix(5:(4*(length(time_splits)-1))), MARGIN = 1, FUN = creation_Func, simplify = T)))
+    
+  }
+  
+  trans_mat
+}
+
 
 #' Title
 #'
