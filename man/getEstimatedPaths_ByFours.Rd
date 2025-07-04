@@ -15,5 +15,5 @@ getEstimatedPaths_ByFours(Data, nsplits)
 an EstimatedPath object.
 }
 \description{
-One of the functions to estimate a path. By Fours method only fits the previous segment, the two splitting segments, and the next segment during each iteration.
+One of the functions to estimate a path. ByFours method only fits the previous segment, the two splitting segments, and the next segment during each iteration.
 }

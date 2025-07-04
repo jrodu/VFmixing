@@ -1,7 +1,7 @@
 #' Get Estimated Path using the By Fours Method
 #' 
 #' @description
-#' One of the functions to estimate a path. By Fours method only fits the previous segment, the two splitting segments, and the next segment during each iteration. 
+#' One of the functions to estimate a path. ByFours method only fits the previous segment, the two splitting segments, and the next segment during each iteration. 
 #' 
 #'
 #' @param Data a numeric n x (d+1) data frame or matrix. The first column is time with the following each dimension's position.
