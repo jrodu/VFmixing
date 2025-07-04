@@ -24,5 +24,6 @@ A function to visualize a series of trajectory functions.
 Traj <- list(matrix(c(0,0,0,1), nrow = 1, byrow = TRUE))
 TimeSplits <- c(0,1)
 
-visualizeFullTrajectories(TrajList = list(Traj), TimeSplitsList = list(TimeSplits), t_grid_size = 0.01)
+visualizeFullTrajectories(TrajList = list(Traj), 
+TimeSplitsList = list(TimeSplits), t_grid_size = 0.01)
 }

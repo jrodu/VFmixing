@@ -89,6 +89,8 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
       return(2*(2*n_dim*(length(cur_path$Path)+1)) + n_points*log(stats::median(unlist(as.vector(cur_path$Error[-1])))))
     }
     
+    AIC = sapply(EstPath, getAIC)
+    
     best_index = which.min(AIC)
     
     print(stringr::str_c("Best Number of Splits was ", best_index-1,"."))

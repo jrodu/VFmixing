@@ -60,7 +60,7 @@ generateIndividualTrajectory = function(startTime, endTime, prevTraj, prevStartT
                                nrow = 2, byrow = T)
     
     sampTraj = MASS::mvrnorm(n = nrow(prevTraj),mu = rep(0,2), Sigma = sigma) + mu
-    
+  
     curTraj = generateC1Smoothness(prevCubic = prevTraj, curCubic = matrix(sampTraj, ncol = 2), 
                                   prevStartTime = prevStartTime, curStartTime = startTime, 
                                   meetTime = startTime)
@@ -71,9 +71,6 @@ generateIndividualTrajectory = function(startTime, endTime, prevTraj, prevStartT
   curTraj
   
 }
-
-
-
 
 #' Generate Full Trajectory Function
 #' 
