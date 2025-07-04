@@ -59,7 +59,7 @@ constructUnboundedCubicSplineModelMatrix_Path = function(Data, time_splits, spli
 #' Title
 #'
 #' @param Data a numeric data frame. The first column is the time and the remaining columns are the positions. 
-#' @param dim a numeric scalar. The number of dimensions in Data. 
+#' @param dim a numeric scalar. The dimension of the data to run the regression. 
 #' @param time_splits a numeric vector. The nodes of the spline with the starting and ending times. 
 #' @param split_labels a numeric or factor vector. Labels for each point in Data for which region of the spline the point falls into. 
 #' @param V_Smooth a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.

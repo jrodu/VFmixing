@@ -15,7 +15,7 @@ runUnboundedCubicSplineRegression_Path(
 \arguments{
 \item{Data}{a numeric data frame. The first column is the time and the remaining columns are the positions.}
 
-\item{dim}{a numeric scalar. The number of dimensions in Data.}
+\item{dim}{a numeric scalar. The dimension of the data to run the regression.}
 
 \item{time_splits}{a numeric vector. The nodes of the spline with the starting and ending times.}
 
