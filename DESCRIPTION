@@ -13,6 +13,8 @@ Imports:
     fastmatrix,
     ggplot2,
     MASS,
+    Matrix,
+    pracma,
     RcppArmadillo,
     stats,
     stringr,
