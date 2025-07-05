@@ -55,6 +55,32 @@ flatVF = function(data_v, baseVectorFields){
 
 }
 
-
+#' TrajWeightedBaseVectorFields
+#' 
+#' @description
+#' Weight a baseVectorFields function using an EstimatedTrajectory object.
+#' 
+#' @param t a numeric scalar. The time the vector fields should be evaluated.
+#' @param curPos a numeric vector. The position in the vector field.
+#' @param baseVectorFields a baseVectorFields function.
+#' @param TrajList a list of numeric matrices. The list of coefficient matrices of the EstimatedTrajectory object.
+#' @param TrajTimeSplits a numeric vector. The nodes of the EstimatedTrajectory object in addition with the starting and ending time.
+#'
+#' @returns a numeric vector. The velocity vector of the trajectory-weighted vector field at the evaluated point in time and position.
+#' @export
+#'
+TrajWeightedBaseVectorFields = function(t, curPos, baseVectorFields, TrajList, TrajTimeSplits){
+  
+  cur_traj_index = min(c(max(c(sum((TrajTimeSplits - t)<0),1)), length(TrajTimeSplits)-1))
+  
+  cur_traj = TrajList[[cur_traj_index]]
+  
+  cur_traj_value = evaluateCubic(t, Cubic = cur_traj, startTime = TrajTimeSplits[cur_traj_index])
+  
+  cur_theorVel = baseVectorFields(t, curPos)
+  
+  t(cur_theorVel %*% t(cur_traj_value))
+  
+}
 
 
