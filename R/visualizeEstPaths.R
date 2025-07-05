@@ -2,7 +2,7 @@
 #'
 #' @param Data a numeric data frame. The first column is the time and the remaining columns are the positions.
 #' @param EstPath an EstimatedPath object.
-#' @param t_grid_size a non-negative numeric scalar. The time grid size of the plotting.
+#' @param t_grid_size a positive numeric scalar. The time grid size of the plotting.
 #' @param x_var a string. The variable name to plot on the x-axis.
 #' @param y_var a string. The variable name to plot on the y-axis.
 #'

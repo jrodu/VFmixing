@@ -11,7 +11,7 @@ visualizeEstPath(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1")
 
 \item{EstPath}{an EstimatedPath object.}
 
-\item{t_grid_size}{a non-negative numeric scalar. The time grid size of the plotting.}
+\item{t_grid_size}{a positive numeric scalar. The time grid size of the plotting.}
 
 \item{x_var}{a string. The variable name to plot on the x-axis.}
 
