@@ -2,6 +2,7 @@
 
 export(RungeKutta)
 export(TrajWeightedBaseVectorFields)
+export(animatePathTraj)
 export(baseVectorFields)
 export(constructIntegralList_PathTraj)
 export(constructIntegralList_Traj)
