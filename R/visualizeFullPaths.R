@@ -12,12 +12,8 @@
 #' @export
 #'
 #' @examples
+#' visualizeFullPaths(list(ExPath$Path), list(ExPath$TimeSplits), 0.01)
 #' 
-#' Path <- list(matrix(c(0,0,0,1,
-#'                       0,0,0,1), nrow = 2, byrow = TRUE))
-#' TimeSplits <- c(0,1)
-#' 
-#' visualizeFullPaths(PathList = list(Path), TimeSplitsList = list(TimeSplits), t_grid_size = 0.01)
 visualizeFullPaths = function(PathList, TimeSplitsList, t_grid_size){
   Full_Path_df = data.frame()
   for(j in 1:length(PathList)){
@@ -44,6 +40,6 @@ visualizeFullPaths = function(PathList, TimeSplitsList, t_grid_size){
     
   }
   
-  ggplot2::ggplot(data = Full_Path_df, ggplot2::aes(x = X1, y = X2, fill = Sample)) + ggplot2::geom_path(ggplot2::aes(text = paste0("Time: ",t,"\n Longitude: ",X1,"\n Latitude: ",X2))) + ggplot2::scale_fill_manual(values = rep("black",length(unique(Full_Path_df$Sample)))) + ggplot2::guides(fill = F)
-  
+  ggplot2::ggplot(data = Full_Path_df, ggplot2::aes(x = X1, y = X2, fill = Sample)) + ggplot2::geom_path() + ggplot2::scale_fill_manual(values = rep("black",length(unique(Full_Path_df$Sample)))) + ggplot2::guides(fill = F)
+
 }

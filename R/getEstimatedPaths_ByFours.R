@@ -9,7 +9,10 @@
 #'
 #' @returns an EstimatedPath object. 
 #' @export
-#'
+#' 
+#' @examples
+#' getEstimatedPaths_ByFours(ExData, 100)
+#' 
 getEstimatedPaths_ByFours = function(Data, nsplits){
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
@@ -18,6 +21,8 @@ getEstimatedPaths_ByFours = function(Data, nsplits){
   time_splits = stats::fivenum(Data$t)
   
   all_splits_est_path = list()
+  
+  est_path = list()
   
   cur_path1 = c()
   cur_path2 = c()

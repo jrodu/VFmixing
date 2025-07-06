@@ -20,14 +20,6 @@ For example: c(X1v1,X2v1,X1v2,X2v2)
 Flattens the matrix output from a vector field function.
 }
 \examples{
-baseVectorFields = function(t, curPos){
-
-f1 = c(curPos[2],-1*curPos[1])
-f2 = c(curPos[1],curPos[2])/sqrt(sum(c(curPos[1],curPos[2])^2))
-
-matrix(c(f1,f2), nrow = 2, byrow = FALSE)
-
-}
-
 flatVF(c(0,1,1), baseVectorFields)
+
 }

@@ -23,3 +23,8 @@ a ggplot2 object.
 \description{
 visualizeEstPath
 }
+\examples{
+visualizeEstPath(ExData, ExEstPath_ByFours, t_grid_size = 0.01, 
+                 x_var = 'X1',y_var = 'X2')
+      
+}

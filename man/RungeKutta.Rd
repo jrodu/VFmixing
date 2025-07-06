@@ -35,3 +35,10 @@ a numeric matrix. Each row is a time and position of the path through the trajec
 \description{
 4th-Order Runge-Kutta Method
 }
+\examples{
+RungeKutta(startTime = 0, startPos = c(1,1), 
+           baseVectorFields = baseVectorFields,
+           TrajList = ExTraj$Traj, TrajTimeSplits = ExTraj$TimeSplits, 
+           endTime = 5, t_step = 0.01)
+
+}

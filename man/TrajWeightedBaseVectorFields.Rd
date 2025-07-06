@@ -29,3 +29,9 @@ a numeric vector. The velocity vector of the trajectory-weighted vector field at
 \description{
 Weight a baseVectorFields function using an EstimatedTrajectory object.
 }
+\examples{
+TrajWeightedBaseVectorFields(t = 1, curPos = c(1,1), baseVectorFields, 
+                             TrajList = ExTraj$Traj, 
+                             TrajTimeSplits = ExTraj$TimeSplits)
+
+}

@@ -10,6 +10,12 @@
 #'
 #' @returns a numeric matrix. Each row is a time and position of the path through the trajectory-weighted vector field.
 #' @export
+#' 
+#' @examples
+#' RungeKutta(startTime = 0, startPos = c(1,1), 
+#'            baseVectorFields = baseVectorFields,
+#'            TrajList = ExTraj$Traj, TrajTimeSplits = ExTraj$TimeSplits, 
+#'            endTime = 5, t_step = 0.01)
 #'
 RungeKutta = function(startTime, startPos, baseVectorFields, TrajList, TrajTimeSplits, endTime, t_step = 0.01){
   

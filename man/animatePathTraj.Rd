@@ -32,3 +32,12 @@ a ggplot2 object. Can be further turned into an animation.
 \description{
 A function to animate a particle traveling through a trajectory-weighted vector field.
 }
+\examples{
+animation <- animatePathTraj(PathList = ExEstPath_Projection$Path, 
+                       TrajList = ExEstTraj_Optimization$Traj, 
+                       PathTimeSplits = ExEstPath_Projection$TimeSplits, 
+                       TrajTimeSplits = ExEstTraj_Optimization$TimeSplits,
+                       baseVectorFields = baseVectorFields, n_points = 500)
+#gganimate::animate(animation)
+  
+}

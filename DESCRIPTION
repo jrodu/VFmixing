@@ -34,3 +34,6 @@ Imports:
     stats,
     stringr,
     svMisc
+Depends: 
+    R (>= 3.5)
+LazyData: true

@@ -78,6 +78,9 @@ runEstPathStep_FullRegression = function(Data, time_splits, V_Smooth = T){
 #'
 #' @returns an EstimatedPath object.
 #' @export
+#' 
+#' @examples
+#' getEstimatedPaths_FullRegression(ExData, 100, FALSE, "BIC")
 #'
 getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC"){
   Data = data.frame(Data)
@@ -131,7 +134,7 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
     }
   }
   
-  getBestSplitsPath(EstPath = all_splits_est_path, show = T, type = Model_Selection_Type, V_Smooth = V_Smooth)
+  getBestSplitsPath(EstPath = all_splits_est_path, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
   
 }
 

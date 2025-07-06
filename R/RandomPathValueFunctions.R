@@ -10,6 +10,10 @@
 #'
 #' @returns a numeric matrix. Each row corresponds to a random position at a time in the t vector.
 #' @export
+#' 
+#' @examples
+#' getRandomEstPathPosition(c(0,0.5,1), ExEstPath_FullRegression)
+#' 
 #'
 getRandomEstPathPosition = function(t, EstPath, random = T){
   
@@ -49,6 +53,9 @@ getRandomEstPathPosition = function(t, EstPath, random = T){
 #'
 #' @returns a numeric matrix. Each row corresponds to a random velocity at a time in the t vector.
 #' @export
+#' 
+#' @examples
+#' getRandomEstPathVelocity(c(0,0.5,1), ExEstPath_FullRegression)
 #'
 getRandomEstPathVelocity = function(t, EstPath, random = T){
   
@@ -89,7 +96,10 @@ getRandomEstPathVelocity = function(t, EstPath, random = T){
 #'
 #' @returns a numeric matrix. Each row corresponds to a random position and velocity at a time in the t vector.
 #' @export
-#'
+#' 
+#' @examples
+#' getRandomEstPathPositionVelocity(c(0,0.5,1), ExEstPath_FullRegression)
+#' 
 getRandomEstPathPositionVelocity = function(t, EstPath, random = T){
   
   n_dim = nrow(EstPath$Path[[1]])

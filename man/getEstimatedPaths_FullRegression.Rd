@@ -27,3 +27,7 @@ an EstimatedPath object.
 \description{
 One of the functions to estimate a path. FullRegression method only fits all segments during each iteration.
 }
+\examples{
+getEstimatedPaths_FullRegression(ExData, 100, FALSE, "BIC")
+
+}

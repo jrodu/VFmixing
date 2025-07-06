@@ -2,7 +2,7 @@
 % Please edit documentation in R/UnboundedPathRegressionFunctions.R
 \name{runUnboundedCubicSplineRegression_Path}
 \alias{runUnboundedCubicSplineRegression_Path}
-\title{Title}
+\title{runUnboundedCubicSplineRegression_Path}
 \usage{
 runUnboundedCubicSplineRegression_Path(
   Data,
@@ -28,5 +28,5 @@ either a list or NULL. NULL if the model matrix is singular.
 If the model matrix is non-singular the list contains the estimates of the coefficients, sigma2, and coefficient covariance matrix.
 }
 \description{
-Title
+runUnboundedCubicSplineRegression_Path
 }

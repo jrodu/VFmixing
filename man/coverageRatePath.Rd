@@ -19,3 +19,7 @@ a numeric vector. Each entry corresponds to the coverage rate for a given dimens
 \description{
 coverageRatePath
 }
+\examples{
+coverageRatePath(ExEstPath_Projection, ExData, 0.95)
+
+}

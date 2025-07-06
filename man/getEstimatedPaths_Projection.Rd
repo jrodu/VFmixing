@@ -27,3 +27,7 @@ an EstimatedPath object.
 \description{
 getEstimatedPaths_Projection
 }
+\examples{
+getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC") 
+
+}

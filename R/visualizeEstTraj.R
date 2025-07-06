@@ -13,7 +13,14 @@
 #'
 #' @returns a ggplot2 object.
 #' @export
-#'
+#' 
+#' @examples
+#' # visualizeEstTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+#' #                  TrueTrajTimeSplits = ExTraj$TimeSplits, 
+#' #                  EstPath = ExEstPath_Projection, 
+#' #                  baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
+#' #                  Cos_Cutoff = 0.91)
+#'   
 visualizeEstTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, EstPath, baseVectorFields, t_grid_size = 0.01, CL = 0.95, P_Int = T, Cos_Cutoff = 0.91){
   
   n_models = nrow(EstTraj$Traj[[1]])

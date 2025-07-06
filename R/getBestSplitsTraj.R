@@ -68,8 +68,8 @@ getLikelihoodTraj = function(EstTraj){
 #' @param EstPath an EstimatedPath object. This is the path all the trajectories where estimated from.
 #' @param show a boolean. TRUE if the criterion values should be displayed.
 #' @param type a string. The model criterion. 
-#' Must pick from the following: BIC, BICOpt, BICPos, AIC, VarPos. 
-#' BIC and AIC can be used with either trajectory method. BICOpt, BICPos, and VarPos can only be used with Optimization.
+#' Must pick from the following: AIC, BIC, or BICOpt. 
+#' BIC and AIC can be used with the ByFours trajectory method. BICOpt musr be used with Optimization.
 #' @param V_Smooth a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.
 #'
 #' @returns an EstimatedTraj object.
@@ -91,8 +91,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     BIC = sapply(EstTrajList, getBIC)
     
     best_index = which.min(BIC)
+    n_splits = EstTrajList[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index-1,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(BIC)
     }
@@ -115,8 +116,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     BIC = sapply(EstTrajList, getBIC)
     
     best_index = which.min(BIC)
+    n_splits = EstTrajList[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index+2,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(BIC)
     }
@@ -159,8 +161,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     BIC_Pos = sapply(EstTrajList, getBICPos)
     
     best_index = which.min(BIC_Pos)
+    n_splits = EstTrajList[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(BIC_Pos)
     }
@@ -181,8 +184,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     AIC = sapply(EstTrajList, getAIC)
     
     best_index = which.min(AIC)
+    n_splits = EstTrajList[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index-1,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(AIC)
     }
@@ -216,8 +220,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     max_PosVar = sapply(EstTrajList, FUN = getMaxEstPosVar, simplify = T)
     
     best_index = which.min(max_PosVar)
+    n_splits = EstTrajList[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(max_PosVar)
     }

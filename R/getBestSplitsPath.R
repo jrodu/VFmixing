@@ -27,8 +27,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     BIC = sapply(EstPath, getBIC)
     
     best_index = which.min(BIC)
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index+2,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(BIC)
     }
@@ -70,8 +71,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     vel_cutoff = which(diff(log(BIC_Vel[,2]))>1)[1]
     
     best_index = which.min(BIC_Vel[1:vel_cutoff])
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(BIC_Vel)
     }
@@ -92,8 +94,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     AIC = sapply(EstPath, getAIC)
     
     best_index = which.min(AIC)
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index-1,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(AIC)
     }
@@ -127,8 +130,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_PosVar = sapply(EstPath, FUN = getMaxEstPosVar, simplify = T)
     
     best_index = which.min(max_PosVar)
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(max_PosVar)
     }
@@ -161,8 +165,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_VelVar = sapply(EstPath, FUN = getMaxEstVelVar, simplify = T)
     
     best_index = which.min(max_VelVar)
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(max_VelVar)
     }
@@ -195,8 +200,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_PosVelVar = sapply(EstPath, FUN = getMaxEstPosVelVar, simplify = T)
     
     best_index = which.min(max_PosVelVar)
+    n_splits = EstPath[[best_index]]$n_splits
     
-    print(stringr::str_c("Best Number of Splits was ", best_index,"."))
+    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
     if(show){
       print(max_PosVelVar)
     }

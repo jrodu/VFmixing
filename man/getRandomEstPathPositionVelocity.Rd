@@ -19,3 +19,7 @@ a numeric matrix. Each row corresponds to a random position and velocity at a ti
 \description{
 Generate both a random position and velocity from an Estimated Path
 }
+\examples{
+getRandomEstPathPositionVelocity(c(0,0.5,1), ExEstPath_FullRegression)
+
+}

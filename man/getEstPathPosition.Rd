@@ -17,3 +17,8 @@ a numeric matrix. Each row corresponds to an evaluated position.
 \description{
 Evaluate the position of a path
 }
+\examples{
+getEstPathPosition(c(0,0.5,1), ExEstPath_ByFours)
+
+
+}

@@ -5,7 +5,10 @@
 #'
 #' @returns a numeric matrix. Each row corresponds to an evaluated value.
 #' @export
-#'
+#' 
+#' @examples
+#' getEstTrajValue(c(0,0.5,1), ExEstTraj_ByFours)
+#' 
 getEstTrajValue = function(t, EstTraj){
   
   n_models = nrow(EstTraj$Traj[[1]])
@@ -35,7 +38,10 @@ getEstTrajValue = function(t, EstTraj){
 #'
 #' @returns a numeric matrix. Each row corresponds to an evaluated slope.
 #' @export
-#'
+#' 
+#' @examples
+#' getEstTrajSlope(c(0,0.5,1), ExEstTraj_ByFours)
+#' 
 getEstTrajSlope = function(t, EstTraj){
   
   n_models = nrow(EstTraj$Traj[[1]])

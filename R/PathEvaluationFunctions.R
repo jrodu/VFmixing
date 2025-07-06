@@ -5,6 +5,10 @@
 #'
 #' @returns a numeric matrix. Each row corresponds to an evaluated position.
 #' @export
+#' 
+#' @examples
+#' getEstPathPosition(c(0,0.5,1), ExEstPath_ByFours)
+#' 
 #'
 getEstPathPosition = function(t, EstPath){
   
@@ -35,6 +39,9 @@ getEstPathPosition = function(t, EstPath){
 #'
 #' @returns a numeric matrix. Each row corresponds to an evaluated velocity.
 #' @export
+#' 
+#' @examples
+#' getEstPathVelocity(c(0,0.5,1), ExEstPath_ByFours)
 #'
 getEstPathVelocity = function(t, EstPath){
   
@@ -65,7 +72,10 @@ getEstPathVelocity = function(t, EstPath){
 #'
 #' @returns a numeric matrix. Each row corresponds to an evaluated acceleration.
 #' @export
-#'
+#' 
+#' @examples
+#' getEstPathAcceleration(c(0,0.5,1), ExEstPath_ByFours)
+#' 
 getEstPathAcceleration = function(t, EstPath){
   
   n_dim = nrow(EstPath$Path[[1]])

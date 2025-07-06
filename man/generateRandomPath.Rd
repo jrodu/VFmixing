@@ -23,3 +23,9 @@ a list of matrices. Each element corresponds to the cubic spline coefficients fo
 \description{
 generateRandomPath
 }
+\examples{
+generateRandomPath(free_param_mean = ExEstPath_FullRegression$Free_Parameters, 
+                   free_param_cov = ExEstPath_FullRegression$Free_Parameter_Cov,
+                   TimeSplits = ExEstPath_FullRegression$TimeSplits, V_Smooth = FALSE)
+
+}

@@ -15,7 +15,13 @@
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
-#'
+#' 
+#' @examples
+#' getEstimatedTrajectories_ByFours(EstPath = ExEstPath_ByFours, nsplits = 100, 
+#'                                  baseVectorFields = baseVectorFields, 
+#'                                  data_int = 0.01, Random_Path = FALSE, 
+#'                                  Path_V_Smooth = FALSE)
+#'    
 getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVectorFields, data_int = 0.001, Random_Path = F, Path_V_Smooth){
   
   n_dim = nrow(EstPath$Path[[1]])

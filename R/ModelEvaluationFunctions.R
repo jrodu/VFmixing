@@ -11,7 +11,13 @@
 #'
 #' @returns a numeric vector. The first is the percent error and the second is the error associated with the percent error.
 #' @export
-#'
+#' 
+#' @examples
+#' cubicPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+#'                   TrueCubic = ExEstTraj_ByFours$Traj, 
+#'                   EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                   TrueTimeSplits = ExEstTraj_ByFours$TimeSplits)
+#'   
 cubicPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits){
   
   integrand = function(t){
@@ -60,7 +66,13 @@ cubicPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits)
 #'
 #' @returns a numeric scalar. 
 #' @export
-#'
+#' 
+#' @examples
+#' cubicAltPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+#'                      TrueCubic = ExTraj$Traj, 
+#'                      EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                      TrueTimeSplits = ExTraj$TimeSplits)
+#' 
 cubicAltPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits){
   
   altPE = c()
@@ -119,6 +131,13 @@ cubicAltPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSpli
 #'
 #' @returns a numeric scalar.
 #' @export
+#' 
+#' @examples
+#' cubicAvgSquareDist(EstCubic = ExEstTraj_Optimization$Traj, 
+#'                    TrueCubic = ExTraj$Traj, 
+#'                    EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                    TrueTimeSplits = ExTraj$TimeSplits)
+#'   
 cubicAvgSquareDist = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits, lower_bound, upper_bound){
   
   integrand = function(t){
@@ -162,7 +181,10 @@ cubicAvgSquareDist = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits
 #'
 #' @returns a numeric vector. Each entry corresponds to the coverage rate for a given dimension.
 #' @export
-#'
+#' 
+#' @examples
+#' coverageRatePath(ExEstPath_Projection, ExData, 0.95)
+#' 
 coverageRatePath = function(EstPath, Data, CL = 0.95){
   
   TimeSplits = EstPath$TimeSplits
@@ -212,6 +234,11 @@ coverageRatePath = function(EstPath, Data, CL = 0.95){
 #'
 #' @returns a numeric vector. Each entry corresponds to the coverage rate for a given model
 #' @export
+#' 
+#' @examples
+#' coverageRateTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+#'                  TrueTrajTimeSplits = ExTraj$TimeSplits, CL = 0.95)
+#'   
 #'
 coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
   
@@ -272,7 +299,11 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
 #'
 #' @returns a numeric scalar.
 #' @export
-#'
+#' 
+#' @examples
+#' avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_Optimization, 
+#'             Path = ExEstPath_Projection, upper = 5, lower = 0)
+#'   
 avgMagError = function(baseVectorFields, Traj, Path, upper, lower){
   
   integrand = function(t){

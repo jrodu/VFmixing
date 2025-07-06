@@ -15,3 +15,7 @@ a ggplot2 object.
 \description{
 visualizeData
 }
+\examples{
+visualizeData(ExData)
+
+}

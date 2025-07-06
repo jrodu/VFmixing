@@ -94,7 +94,13 @@ runEstTrajStep_Optimization = function(EstPath, baseVectorFields, TimeSplits, wo
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
-#'
+#' 
+#' @examples
+#' ExEstTraj_Optimization = getEstimatedTrajectories_Optimization(
+#'      EstPath = ExEstPath_Projection, 
+#'      nsplits = 100, baseVectorFields = baseVectorFields, 
+#'      V_Smooth = FALSE, Model_Selection_Type = "BICOpt", Random_Path = FALSE)
+#'     
 getEstimatedTrajectories_Optimization = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BICOpt", Random_Path = F){
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
@@ -141,7 +147,7 @@ getEstimatedTrajectories_Optimization = function(EstPath, nsplits, baseVectorFie
     }
   }
   
-  getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = T, type = Model_Selection_Type, V_Smooth = V_Smooth)
+  getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
   
 }
 

@@ -39,16 +39,8 @@ baseVectorFields = function(t, curPos){
 #' @export
 #'
 #' @examples
-#' baseVectorFields = function(t, curPos){
-#'
-#' f1 = c(curPos[2],-1*curPos[1])
-#' f2 = c(curPos[1],curPos[2])/sqrt(sum(c(curPos[1],curPos[2])^2))
-#'
-#' matrix(c(f1,f2), nrow = 2, byrow = FALSE)
-#'
-#'}
-#' 
 #' flatVF(c(0,1,1), baseVectorFields)
+#' 
 flatVF = function(data_v, baseVectorFields){
 
   c(baseVectorFields(data_v[1],data_v[-1]))
@@ -68,7 +60,12 @@ flatVF = function(data_v, baseVectorFields){
 #'
 #' @returns a numeric vector. The velocity vector of the trajectory-weighted vector field at the evaluated point in time and position.
 #' @export
-#'
+#' 
+#' @examples
+#' TrajWeightedBaseVectorFields(t = 1, curPos = c(1,1), baseVectorFields, 
+#'                              TrajList = ExTraj$Traj, 
+#'                              TrajTimeSplits = ExTraj$TimeSplits)
+#' 
 TrajWeightedBaseVectorFields = function(t, curPos, baseVectorFields, TrajList, TrajTimeSplits){
   
   cur_traj_index = min(c(max(c(sum((TrajTimeSplits - t)<0),1)), length(TrajTimeSplits)-1))

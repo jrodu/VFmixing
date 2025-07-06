@@ -17,3 +17,7 @@ a numeric matrix. Each row corresponds to an evaluated value.
 \description{
 getEstTrajValue
 }
+\examples{
+getEstTrajValue(c(0,0.5,1), ExEstTraj_ByFours)
+
+}

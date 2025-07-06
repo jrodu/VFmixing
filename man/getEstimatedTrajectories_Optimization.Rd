@@ -34,3 +34,10 @@ an EstimatedTrajectory object.
 \description{
 getEstimatedTrajectories_Optimization
 }
+\examples{
+ExEstTraj_Optimization = getEstimatedTrajectories_Optimization(
+     EstPath = ExEstPath_Projection, 
+     nsplits = 100, baseVectorFields = baseVectorFields, 
+     V_Smooth = FALSE, Model_Selection_Type = "BICOpt", Random_Path = FALSE)
+    
+}

@@ -4,7 +4,10 @@
 #'
 #' @returns a ggplot2 object.
 #' @export
-#'
+#' 
+#' @examples
+#' visualizeData(ExData)
+#' 
 visualizeData = function(Data){
   ggplot2::ggplot(data = Data, ggplot2::aes(x = X1, y = X2)) + ggplot2::geom_point()
 }

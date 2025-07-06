@@ -36,3 +36,10 @@ an EstimatedTrajectory object.
 \description{
 By fours method for estimating the trajectory functions.
 }
+\examples{
+getEstimatedTrajectories_ByFours(EstPath = ExEstPath_ByFours, nsplits = 100, 
+                                 baseVectorFields = baseVectorFields, 
+                                 data_int = 0.01, Random_Path = FALSE, 
+                                 Path_V_Smooth = FALSE)
+   
+}

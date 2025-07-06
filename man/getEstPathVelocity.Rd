@@ -17,3 +17,7 @@ a numeric matrix. Each row corresponds to an evaluated velocity.
 \description{
 Evaluate the velocity of a path
 }
+\examples{
+getEstPathVelocity(c(0,0.5,1), ExEstPath_ByFours)
+
+}

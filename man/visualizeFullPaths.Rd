@@ -20,10 +20,6 @@ a ggplot2 object.
 A function to visualize a series of path functions.
 }
 \examples{
+visualizeFullPaths(list(ExPath$Path), list(ExPath$TimeSplits), 0.01)
 
-Path <- list(matrix(c(0,0,0,1,
-                      0,0,0,1), nrow = 2, byrow = TRUE))
-TimeSplits <- c(0,1)
-
-visualizeFullPaths(PathList = list(Path), TimeSplitsList = list(TimeSplits), t_grid_size = 0.01)
 }

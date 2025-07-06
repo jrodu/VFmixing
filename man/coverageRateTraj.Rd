@@ -21,3 +21,9 @@ a numeric vector. Each entry corresponds to the coverage rate for a given model
 \description{
 coverageRateTraj
 }
+\examples{
+coverageRateTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+                 TrueTrajTimeSplits = ExTraj$TimeSplits, CL = 0.95)
+  
+
+}

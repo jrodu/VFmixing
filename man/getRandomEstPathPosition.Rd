@@ -19,3 +19,8 @@ a numeric matrix. Each row corresponds to a random position at a time in the t v
 \description{
 Generating random positions using the normal distrubutions induced by the linear regression.
 }
+\examples{
+getRandomEstPathPosition(c(0,0.5,1), ExEstPath_FullRegression)
+
+
+}

@@ -10,7 +10,12 @@
 #'
 #' @returns a list of matrices. Each element corresponds to the cubic spline coefficients for each region.
 #' @export
-#'
+#' 
+#' @examples
+#' generateRandomPath(free_param_mean = ExEstPath_FullRegression$Free_Parameters, 
+#'                    free_param_cov = ExEstPath_FullRegression$Free_Parameter_Cov,
+#'                    TimeSplits = ExEstPath_FullRegression$TimeSplits, V_Smooth = FALSE)
+#' 
 generateRandomPath = function(free_param_mean, free_param_cov, TimeSplits, V_Smooth){
   
   n_dim = nrow(free_param_mean)

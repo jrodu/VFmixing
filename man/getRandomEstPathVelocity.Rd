@@ -19,3 +19,7 @@ a numeric matrix. Each row corresponds to a random velocity at a time in the t v
 \description{
 Generate a random velocity from an Estimated Path
 }
+\examples{
+getRandomEstPathVelocity(c(0,0.5,1), ExEstPath_FullRegression)
+
+}

@@ -21,3 +21,10 @@ a numeric scalar.
 \description{
 Another cubic percent error-like metric.
 }
+\examples{
+cubicAltPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+                     TrueCubic = ExTraj$Traj, 
+                     EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+                     TrueTimeSplits = ExTraj$TimeSplits)
+
+}

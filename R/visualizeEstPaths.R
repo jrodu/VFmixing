@@ -8,7 +8,11 @@
 #'
 #' @returns a ggplot2 object.
 #' @export
-#'
+#' 
+#' @examples
+#' visualizeEstPath(ExData, ExEstPath_ByFours, t_grid_size = 0.01, 
+#'                  x_var = 'X1',y_var = 'X2')
+#'       
 visualizeEstPath = function(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1"){
   Data = data.frame(Data)
   names(Data) = c("t",stringr::str_c("X",1:(ncol(Data)-1)))

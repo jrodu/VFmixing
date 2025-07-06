@@ -174,7 +174,7 @@ constructUnboundedCubicSplineTransitionMatrix_Path = function(time_splits, V_Smo
 }
 
 
-#' Title
+#' runUnboundedCubicSplineRegression_Path
 #'
 #' @param Data a numeric data frame. The first column is the time and the remaining columns are the positions. 
 #' @param dim a numeric scalar. The dimension of the data to run the regression. 

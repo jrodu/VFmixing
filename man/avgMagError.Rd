@@ -23,3 +23,8 @@ a numeric scalar.
 \description{
 Finds the average magnitude of the error velocity vectors.
 }
+\examples{
+avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_Optimization, 
+            Path = ExEstPath_Projection, upper = 5, lower = 0)
+  
+}
