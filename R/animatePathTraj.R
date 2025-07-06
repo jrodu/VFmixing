@@ -14,6 +14,14 @@
 #' @returns a ggplot2 object. Can be further turned into an animation.
 #' @export
 animatePathTraj = function(PathList, TrajList, PathTimeSplits, TrajTimeSplits, baseVectorFields, n_points){
+  
+  if (!requireNamespace("gganimate", quietly = TRUE)) {
+    stop(
+      "Package \"gganimate\" must be installed to use this function.",
+      call. = FALSE
+    )
+  }
+  
   n_dim = nrow(PathList[[1]])
   n_traj = nrow(TrajList[[1]])
   t_seq = seq(min(PathTimeSplits), max(PathTimeSplits), length.out = n_points)
