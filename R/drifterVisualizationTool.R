@@ -19,7 +19,18 @@
 #'
 #' @returns a shiny app.
 #' @export
-#'
+#' 
+#' @examples
+#' # drifterVisualizationTool(path = ExEstPath_ByFours, 
+#' #   traj_list = list(ExEstTraj_ByFours, ExEstTraj_Optimization), 
+#' #   baseVectorFields = baseVectorFields, propagation_list = ExPropagationList, 
+#' #   path_t_grid_size = 0.01, traj_t_grid_size = 0.01, 
+#' #   model_names = c("Rotation","Expansion"), 
+#' #   method_names = c("ByFours","Optimization"), 
+#' #  model_colors = c('darkorange','purple'), 
+#' #   method_colors = c("#FEFE62", "#D35FB7"), vector_field_arrow_scale = 0.1, 
+#' #   vector_field_grid_resolution = 25)
+#' 
 drifterVisualizationTool = function(path, traj_list, baseVectorFields, propagation_list, 
                                     path_t_grid_size, traj_t_grid_size, 
                                     model_names, method_names,
@@ -499,7 +510,7 @@ drifterVisualizationTool = function(path, traj_list, baseVectorFields, propagati
       map <- leaflet::leaflet(data = combined_map_data) %>%
         leaflet::fitBounds(lng1 = min(path_highres_df$lon), lat1 = min(path_highres_df$lat),
                   lng2 = max(path_highres_df$lon), lat2 = max(path_highres_df$lat)) %>%
-        leaflet::addProviderTiles(providers$Esri.OceanBasemap, group = "Ocean Basemap") %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.OceanBasemap, group = "Ocean Basemap") %>%
         # Add arrowheads as before
         leaflet.extras2::addArrowhead(data = path_highres_df, lng = ~lon, lat = ~lat, color = 'black', stroke = F,
                      options = leaflet.extras2::arrowheadOptions(frequency = "80px", size = "10px", fill = TRUE, opacity = 0.9)) %>%

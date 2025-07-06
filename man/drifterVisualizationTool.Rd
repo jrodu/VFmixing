@@ -50,3 +50,15 @@ a shiny app.
 \description{
 A shiny application to take a deep dive into both paths and trajectories.
 }
+\examples{
+# drifterVisualizationTool(path = ExEstPath_ByFours, 
+#   traj_list = list(ExEstTraj_ByFours, ExEstTraj_Optimization), 
+#   baseVectorFields = baseVectorFields, propagation_list = ExPropagationList, 
+#   path_t_grid_size = 0.01, traj_t_grid_size = 0.01, 
+#   model_names = c("Rotation","Expansion"), 
+#   method_names = c("ByFours","Optimization"), 
+#  model_colors = c('darkorange','purple'), 
+#   method_colors = c("#FEFE62", "#D35FB7"), vector_field_arrow_scale = 0.1, 
+#   vector_field_grid_resolution = 25)
+
+}

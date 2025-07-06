@@ -13,7 +13,7 @@
 #' getPropagationList(Path = ExEstPath_ByFours, 
 #'              TrajList = list(ExEstTraj_ByFours, ExEstTraj_Optimization), 
 #'              baseVectorFields = baseVectorFields, 
-#'              prop_t_grid_size = 0.1, n_prop_steps = 10)
+#'             prop_t_grid_size = 0.1, n_prop_steps = 10)
 #' 
 getPropagationList = function(Path, TrajList, baseVectorFields, prop_t_grid_size, n_prop_steps){
   
