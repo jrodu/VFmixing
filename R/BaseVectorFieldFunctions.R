@@ -16,7 +16,7 @@
 #' baseVectorFields(0, c(1,1))
 baseVectorFields = function(t, curPos){
 
-  f1 = c(curPos[2],-1*curPos[1])
+  f1 = c(curPos[2],-1*curPos[1])/sqrt(sum(c(curPos[1],curPos[2])^2))
   f2 = c(curPos[1],curPos[2])/sqrt(sum(c(curPos[1],curPos[2])^2))
 
   matrix(c(f1,f2), nrow = 2, byrow = F)
