@@ -139,3 +139,17 @@
 #' 
 #' @source The example in the getEstimatedTrajectories_Optimization function.
 "ExEstTraj_Optimization"
+
+#' Example PropagationList
+#'
+#' An example propagation list used in the drifterVisualizationTool.
+#'
+#' @format ## `ExPropagationList`
+#' A list with 2 elements: 
+#' \describe{
+#'   \item{First}{A data frame with the propagation estimates.}
+#'   \item{Second}{A list of matrices with the intermediate Runge Kutta steps for each propagation.}
+#' }
+#' 
+#' @source The example in the getPropagationList function.
+"ExPropagationList"
