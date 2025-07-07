@@ -3,7 +3,8 @@ Title: Vector Field Model Mixing
 Version: 0.0.0.9000
 Authors@R: 
     person("Kyle", "Peterson", , "kdp2abu@virginia.edu", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Description: Functions to carry out methodology specifically designed to mix 
+vector fields given potentially noisy positional data.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
