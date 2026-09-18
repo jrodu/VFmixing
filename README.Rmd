@@ -59,23 +59,23 @@ step involves estimating the path the particle took through the vector field.
 We do this to get better estimates of both position and velocity that would
 otherwise be compromised extremely quickly with only a small degree of error.
 We provide three unique methods to estimate the path using cubic splines: 
-ByFours, FullRegression, and Projection. Each method has its pros and 
+"ByFours", "Full Regression", and "Projection". Each method has its pros and 
 cons.
 
-ByFours:  
-Pros: Extremely Fast Computation and Great Estimates  
-Con: No Theoretical Covariance Structure)
+"ByFours":  
+Pros: Extremely Fast Computation and Stable Estimates  
+Con: No Estimable Covariance Structure
                 
-FullRegression:  
-Pros: Great Estimates and Theoretical Covariance Structure  
+"Full Regression":  
+Pros: Stable Estimates and a Estimable Covariance Structure  
 Con: Slower Computation
                     
-Projection:  
-Pros: Theoretical Covariance Structure and Reasonably Quick Computation  
-Con: Estimates can falter if the data is too complex
+"Projection":  
+Pros: Estimable Covariance Structure and Reasonably Quick Computation  
+Con: Estimates may be unstable under extremely complex data
             
-For complex real world scenarios, we recommend using the ByFours method, but 
-for this example we will showcase the Projection method as the data is not too 
+For complex real world scenarios, we recommend using the "ByFours" method, but 
+for this example we will showcase the "Projection" method as the data is not too 
 complex.
 
 ```{r}
@@ -94,31 +94,31 @@ With the path of the particle estimated, we can move to the main event: the
 trajectory step. We want to estimate the weight functions for each 
 mixing vector field. We call the weight functions the Trajectory of each
 field. Again, we provide a couple unique methods to estimate the trajectory 
-functions using cubic splines: ByFours and Optimization. Similar to the ByFours 
+functions using cubic splines: "ByFours" and "One-Shot". Similar to the "ByFours" 
 path method, this method runs extremely fast, outputs good estimates even 
 with complex paths, but does not output a theoretical covariance structure. The 
-ByFours method can be used regardless of which method was used to estimate the 
-path. The Optimization method uses the path covariance structure to transform 
+"ByFours" method can be used regardless of which method was used to estimate the 
+path. The "One-Shot" method uses the path covariance structure to transform 
 the path coefficients into the trajectory coefficients. This method has a much 
 higher computational cost and the estimates can sometimes falter with complex 
 paths, but yields a theoretical covariance structure under the assumption 
 that the mixing vector fields are relatively constant in a small window defined 
-by the path error. The Optimization method can only be used if the path was 
-estimated using the FullRegression or Projection methods. In practice, we 
-recommend using the ByFours method again, simply due to the much lower 
-computational cost, but since we used the Projection methods for the path, we 
-showcase the Optimization method for the trajectories.
+by the path error. The "One-Shot" method can only be used if the path was 
+estimated using the "Full Regression" or "Projection" methods. In practice, we 
+recommend using the "ByFours" method again, simply due to the much lower 
+computational cost, but since we used the "Projection" methods for the path, we 
+showcase the "One-Shot" method for the trajectories.
 
 ```{r}
 
-# EstTraj <- getEstimatedTrajectories_Optimization(EstPath = EstPath, 
+# EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, 
 #                                                  nsplits = 100,
 #                                      baseVectorFields = baseVectorFields,
 #                                      V_Smooth = F,
 #                                      Model_Selection_Type = "BICOpt",
 #                                      Random_Path = F)
 
-EstTraj <- VFmixing::ExEstTraj_Optimization
+EstTraj <- VFmixing::ExEstTraj_OneShot
 TrueTraj <- VFmixing::ExTraj
 visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj, 
                  TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = EstPath, 

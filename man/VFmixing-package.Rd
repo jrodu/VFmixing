@@ -6,7 +6,7 @@
 \alias{VFmixing-package}
 \title{VFmixing: Vector Field Model Mixing}
 \description{
-What the package does (one paragraph).
+Functions to carry out methodology specifically designed to mix vector fields given potentially noisy positional data.
 }
 \author{
 \strong{Maintainer}: Kyle Peterson \email{kdp2abu@virginia.edu}
