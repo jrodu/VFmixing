@@ -1,4 +1,4 @@
-#' runEstTrajStep_Optimization
+#' runEstTrajStep_OneShot
 #'
 #' @param EstPath an EtsimatedPath object.
 #' @param baseVectorFields a baseVectorFields functions.
@@ -14,7 +14,7 @@
 #' @returns an EstimatedTrajectory object.
 #' @export
 #'
-runEstTrajStep_Optimization = function(EstPath, baseVectorFields, TimeSplits, worst_split, cur_integral_list_traj, cur_integral_list_pathtraj, n_dim, n_models, Path_VSmooth, Traj_VSmooth){
+runEstTrajStep_OneShot = function(EstPath, baseVectorFields, TimeSplits, worst_split, cur_integral_list_traj, cur_integral_list_pathtraj, n_dim, n_models, Path_VSmooth, Traj_VSmooth){
   
   Path_TimeSplits = EstPath$TimeSplits
   
@@ -81,7 +81,7 @@ runEstTrajStep_Optimization = function(EstPath, baseVectorFields, TimeSplits, wo
 
 
 
-#' getEstimatedTrajectories_Optimization
+#' getEstimatedTrajectories_OneShot
 #'
 #' @param EstPath an EstimatedPath object.
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
@@ -96,12 +96,12 @@ runEstTrajStep_Optimization = function(EstPath, baseVectorFields, TimeSplits, wo
 #' @export
 #' 
 #' @examples
-#' ExEstTraj_Optimization = getEstimatedTrajectories_Optimization(
+#' ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
 #'      EstPath = ExEstPath_Projection, 
 #'      nsplits = 100, baseVectorFields = baseVectorFields, 
 #'      V_Smooth = FALSE, Model_Selection_Type = "BICOpt", Random_Path = FALSE)
 #'     
-getEstimatedTrajectories_Optimization = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BICOpt", Random_Path = F){
+getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BICOpt", Random_Path = F){
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
@@ -117,7 +117,7 @@ getEstimatedTrajectories_Optimization = function(EstPath, nsplits, baseVectorFie
   
   all_splits_est_traj = list()
   
-  all_splits_est_traj[[1]] = runEstTrajStep_Optimization(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = 1, cur_integral_list_traj = list(), cur_integral_list_pathtraj = list(), n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
+  all_splits_est_traj[[1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = 1, cur_integral_list_traj = list(), cur_integral_list_pathtraj = list(), n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
   
   svMisc::progress(1, max.value = nsplits, progress.bar = T, console = T)
   
@@ -136,7 +136,7 @@ getEstimatedTrajectories_Optimization = function(EstPath, nsplits, baseVectorFie
       
       time_splits = c(time_splits[1:worst_split], mean(c(time_splits[worst_split], time_splits[worst_split+1])), time_splits[(worst_split+1):length(time_splits)])
       
-      all_splits_est_traj[[length(all_splits_est_traj)+1]] = runEstTrajStep_Optimization(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = worst_split, cur_integral_list_traj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_Traj, cur_integral_list_pathtraj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_PathTraj, n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
+      all_splits_est_traj[[length(all_splits_est_traj)+1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = worst_split, cur_integral_list_traj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_Traj, cur_integral_list_pathtraj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_PathTraj, n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
       
       svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
       

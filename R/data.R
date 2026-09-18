@@ -121,9 +121,9 @@
 
 #' Example Estimated Trajectory
 #'
-#' A trajectory estimated using the Optimization method.
+#' A trajectory estimated using the OneShot method.
 #'
-#' @format ## `ExEstTraj_Optimization`
+#' @format ## `ExEstTraj_OneShot`
 #' A list with 9 elements: 
 #' \describe{
 #'   \item{Traj}{A list of cubic coefficient matrices.}
@@ -137,8 +137,8 @@
 #'   \item{IntegralList_PathTraj}{A list of matrices used to transform the path coefficients into the trajectory coefficients.}
 #' }
 #' 
-#' @source The example in the getEstimatedTrajectories_Optimization function.
-"ExEstTraj_Optimization"
+#' @source The example in the getEstimatedTrajectories_OneShot function.
+"ExEstTraj_OneShot"
 
 #' Example PropagationList
 #'
