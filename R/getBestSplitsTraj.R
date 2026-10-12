@@ -82,10 +82,10 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getBIC = function(cur_traj){
       
       n_models = nrow(cur_traj$Traj[[1]])
-      n_points = nrow(cur_traj$Error)*(ncol(cur_traj$Error)-1)
+      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_param = n_models*(4 + V_Smooth*(length(cur_traj$Traj)-1) + (!V_Smooth)*2*(length(cur_traj$Traj)-1))
       
-      return(n_param*log(n_points) + n_points*log(stats::median(rowSums(cur_traj$Error[,-1]))) - 2*getLikelihoodTraj(EstTraj = cur_traj))
+      return(n_param*log(EDF) + EDF*log(stats::median(rowSums(cur_traj$Error[,-1]))))# - 2*getLikelihoodTraj(EstTraj = cur_traj))
     }
     
     BIC = sapply(EstTrajList, getBIC)
@@ -100,15 +100,15 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     
   }
   
-  if(type == "BICOpt"){
+  if(type == "BICOS"){
     
     getBIC = function(cur_traj){
       
       n_models = nrow(cur_traj$Traj[[1]])
-      n_points = nrow(EstPath$Error)*(ncol(EstPath$Error)-1)
+      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_param = n_models*(4 + V_Smooth*(length(cur_traj$Traj)-1) + (!V_Smooth)*2*(length(cur_traj$Traj)-1))
       
-      return(n_param*log(n_points) + n_points*log(sum(cur_traj$Error)/(max(cur_traj$TimeSplits)-min(cur_traj$TimeSplits))) - 2*getLikelihoodTraj(EstTraj = cur_traj))
+      return(n_param*log(EDF) + EDF*log(sum(cur_traj$Error)/(max(cur_traj$TimeSplits)-min(cur_traj$TimeSplits))))# - 2*getLikelihoodTraj(EstTraj = cur_traj))
 
     }
     
@@ -130,7 +130,7 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getBICPos = function(cur_traj){
       
       t_seq = cur_traj$Error[,1]
-      n_points = length(t_seq)
+      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_models = nrow(cur_traj$Traj[[1]])
       n_param = n_models*(4 + V_Smooth*(length(cur_traj)-1) + (!V_Smooth)*2*(length(cur_traj)-1))
       TimeSplits = cur_traj$TimeSplits
@@ -151,7 +151,7 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
       
       cur_PosVar = unname(stats::quantile(apply(matrix(t_seq), MARGIN = 1, FUN = evaluateIndividualTraj), probs = c(0.95)))
       
-      cur_BIC = (n_param)*log(n_points) + n_points*log(stats::median(unlist(as.vector(cur_traj$Error[,-1]))))
+      cur_BIC = (n_param)*log(EDF) + EDF*log(stats::median(unlist(as.vector(cur_traj$Error[,-1]))))
       
       cur_BIC / cur_PosVar
       
@@ -175,9 +175,9 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getAIC = function(cur_traj){
       
       n_models = nrow(cur_traj$Traj[[1]])
-      n_points = nrow(cur_traj$Error)*(ncol(cur_traj$Error)-1)
+      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       
-      return(2*(2*n_models*(length(cur_traj$Traj)+1)) + n_points*log(stats::median(unlist(as.vector(cur_traj$Error[,1])))) - 2*getLikelihoodTraj(EstTraj = cur_traj))
+      return(2*(2*n_models*(length(cur_traj$Traj)+1)) + EDF*log(stats::median(unlist(as.vector(cur_traj$Error[,1]))))) # - 2*getLikelihoodTraj(EstTraj = cur_traj))
       
     }
     
@@ -198,7 +198,7 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getMaxEstPosVar = function(cur_traj){
       
       t_seq = seq(min(cur_traj$TimeSplits), max(cur_traj$TimeSplits), by = 0.01)
-      n_points = length(t_seq)
+      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_models = nrow(cur_traj$Traj[[1]])
       TimeSplits = cur_traj$TimeSplits
       Cov = cur_traj$Cov
