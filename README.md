@@ -21,9 +21,9 @@ pak::pak("jrodu/VFmixing")
 
 ## Example
 
-This is an example showing how to use the main set of functions. Let’s
-look at the noisy positional data from a particle moving through a some
-unknown vector field.
+This example shows how to use the main set of functions. Let’s look at
+the noisy positional data from a particle moving through some unknown
+vector field.
 
 ``` r
 library(VFmixing)
@@ -48,118 +48,120 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x000001fe2bd20708>
+#> <bytecode: 0x000001f31f3919d8>
 #> <environment: namespace:VFmixing>
 ```
 
-Now that the baseVectorFields function has been defined, we can begin
+Now that the `baseVectorFields` function has been defined, we can begin
 the mixing process. This is broken into two steps: Path and Trajectory.
-The first step involves estimating the path the particle took through
-the vector field. We do this to get better estimates of both position
-and velocity that would otherwise be compromised extremely quickly with
-only a small degree of error. We provide three unique methods to
-estimate the path using cubic splines: “ByFours”, “Full Regression”, and
-“Projection”. Each method has its pros and cons.
 
-“ByFours”:  
-Pros: Extremely Fast Computation and Stable Estimates  
-Con: No Estimable Covariance Structure
+### Step 1: Estimate the path
 
-“Full Regression”:  
-Pros: Stable Estimates and a Estimable Covariance Structure  
-Con: Slower Computation
+The first step estimates the path the particle took through the vector
+field. We do this to get better estimates of both position and velocity,
+which would otherwise be compromised extremely quickly with only a small
+degree of error. The path is estimated with a cubic spline using
+`getEstimatedPaths_FullFours()`.
 
-“Projection”:  
-Pros: Estimable Covariance Structure and Reasonably Quick Computation  
-Con: Estimates may be unstable under extremely complex data
+The “FullFours” method works in two stages:
 
-For complex real world scenarios, we recommend using the “ByFours”
-method, but for this example we will showcase the “Projection” method as
-the data is not too complex.
+1.  The fast “ByFours” algorithm searches for the spline nodes. Each
+    time a region is split, only the four neighboring segments are
+    refit, so the search is extremely fast. The number of nodes is
+    chosen by BIC.
+2.  A single full regression is then fit on the selected nodes. This
+    gives stable estimates and an estimable covariance structure for the
+    path.
+
+The result is the speed of “ByFours” together with the covariance
+structure needed for confidence intervals, random path draws, and the
+“One-Shot” trajectory method below.
 
 ``` r
-
-# EstPath <- getEstimatedPaths_Projection(Data = Data, nsplits = 100, 
-#                                         V_Smooth = F, 
-#                                         Model_Selection_Type = "BIC")
-
-EstPath <- VFmixing::ExEstPath_Projection
-visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01, 
-                 x_var = 'X1', y_var = 'X2')
+EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
 ```
 
-<img src="man/figures/README-unnamed-chunk-4-1.png" width="100%" />
-
-With the path of the particle estimated, we can move to the main event:
-the trajectory step. We want to estimate the weight functions for each
-mixing vector field. We call the weight functions the Trajectory of each
-field. Again, we provide a couple unique methods to estimate the
-trajectory functions using cubic splines: “ByFours” and “One-Shot”.
-Similar to the “ByFours” path method, this method runs extremely fast,
-outputs good estimates even with complex paths, but does not output a
-theoretical covariance structure. The “ByFours” method can be used
-regardless of which method was used to estimate the path. The “One-Shot”
-method uses the path covariance structure to transform the path
-coefficients into the trajectory coefficients. This method has a much
-higher computational cost and the estimates can sometimes falter with
-complex paths, but yields a theoretical covariance structure under the
-assumption that the mixing vector fields are relatively constant in a
-small window defined by the path error. The “One-Shot” method can only
-be used if the path was estimated using the “Full Regression” or
-“Projection” methods. In practice, we recommend using the “ByFours”
-method again, simply due to the much lower computational cost, but since
-we used the “Projection” methods for the path, we showcase the
-“One-Shot” method for the trajectories.
-
 ``` r
-
-# EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, 
-#                                                  nsplits = 100,
-#                                      baseVectorFields = baseVectorFields,
-#                                      V_Smooth = F,
-#                                      Model_Selection_Type = "BICOS",
-#                                      Random_Path = F)
-
-EstTraj <- VFmixing::ExEstTraj_OneShot
-TrueTraj <- VFmixing::ExTraj
-visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj, 
-                 TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = EstPath, 
-                 baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
-                 CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
+visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
+                 x_var = 'X1', y_var = 'X2')
 ```
 
 <img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
 
-In the plot above, we can see our estimate of the trajectory (solid
-line) next to the true trajectories used to construct the data (dashed
-line). Even with a reasonable amount of error in our data, visually, we
-did pretty well and the confidence region captures a good percentage of
-the true trajectory functions. However, we can use a couple more
-functions to evaluate our method’s performance using the average squared
-distance between the estimated trajectories and the truth, as well as
-calculating the coverage rate of the trajectories.
+This estimated path is also included in the package as
+`ExEstPath_FullFours`.
+
+<details>
+<summary>
+Other path methods
+</summary>
+
+The package also provides the methods that “FullFours” is built from.
+They are mainly useful for comparison:
+
+- `getEstimatedPaths_ByFours()`: the node search on its own. Very fast,
+  but without a covariance structure.
+- `getEstimatedPaths_FullRegression()`: refits the full spline at every
+  split. Has a covariance structure, but is much slower.
+- `getEstimatedPaths_Projection()`: fits each region separately and
+  projects onto the smooth spline space. Has a covariance structure, but
+  estimates can be unstable for very complex data.
+
+</details>
+
+### Step 2: Estimate the trajectories
+
+With the path of the particle estimated, we can move to the main event:
+the trajectory step. We want to estimate the weight functions for each
+mixing vector field. We call the weight functions the Trajectory of each
+field. These are also estimated with cubic splines.
+
+Because the “FullFours” path has a covariance structure, we can use the
+“One-Shot” method. It uses the path covariance structure to transform
+the path coefficients into the trajectory coefficients, which yields a
+theoretical covariance structure for the trajectories under the
+assumption that the mixing vector fields are relatively constant in a
+small window defined by the path error. A faster alternative without a
+covariance structure is `getEstimatedTrajectories_ByFours()`.
 
 ``` r
+EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
+                                            baseVectorFields = baseVectorFields)
+```
 
-AvgSqDist = cubicAvgSquareDist(EstCubic = EstTraj$Traj, 
-                               TrueCubic = TrueTraj$Traj, 
+``` r
+TrueTraj <- VFmixing::ExTraj
+visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
+                 TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = EstPath,
+                 baseVectorFields = baseVectorFields, t_grid_size = 0.01,
+                 CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
+```
+
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+
+In the plot above, we can see our estimate of the trajectory (solid
+line) next to the true trajectories used to construct the data (dashed
+line). We can evaluate the method’s performance more formally using the
+average squared distance between the estimated trajectories and the
+truth, as well as the coverage rate of the trajectories’ 95% intervals.
+
+``` r
+AvgSqDist = cubicAvgSquareDist(EstCubic = EstTraj$Traj,
+                               TrueCubic = TrueTraj$Traj,
                                EstTimeSplits = EstTraj$TimeSplits,
-                               TrueTimeSplits = TrueTraj$TimeSplits, 
+                               TrueTimeSplits = TrueTraj$TimeSplits,
                                lower_bound = min(EstTraj$TimeSplits),
                                upper_bound = max(EstTraj$TimeSplits))
 AvgSqDist
-#> [1] 0.0003214484
+#> [1] 0.0002546923
 
-TrajCovRate = coverageRateTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj, 
-                               TrueTrajTimeSplits = TrueTraj$TimeSplits, 
+TrajCovRate = coverageRateTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
+                               TrueTrajTimeSplits = TrueTraj$TimeSplits,
                                CL = 0.95)
 TrajCovRate
-#> [1] 0.8003992
+#> [1] 1
 ```
 
-We can see that the average squared distance is extremely small, but the
-coverage rate is lower than 95%, which we would’ve expected. Therefore,
-the assumption that the mixing vector fields are constant within the
-error region of a data point is not met, which we could have imagined
-due to the nature of the vector fields and the amount of error in the
-data.
+The average squared distance is extremely small, and the coverage rate
+is 100%, at or above the nominal 95%. For this example the intervals
+are, if anything, conservative.

@@ -17,7 +17,7 @@
 #' @examples
 #' # visualizeEstTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj, 
 #' #                  TrueTrajTimeSplits = ExTraj$TimeSplits, 
-#' #                  EstPath = ExEstPath_Projection, 
+#' #                  EstPath = ExEstPath_FullFours, 
 #' #                  baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
 #' #                  Cos_Cutoff = 0.91)
 #'   

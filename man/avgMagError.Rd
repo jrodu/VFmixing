@@ -25,6 +25,6 @@ Finds the average magnitude of the error velocity vectors.
 }
 \examples{
 avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_OneShot, 
-            Path = ExEstPath_Projection, upper = 5, lower = 0)
+            Path = ExEstPath_FullFours, upper = 5, lower = 0)
   
 }
