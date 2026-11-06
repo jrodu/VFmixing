@@ -8,7 +8,8 @@ getEstimatedPaths_ByFours(
   Data,
   nsplits,
   Model_Selection_Type = "BIC",
-  return_all = F
+  return_all = F,
+  patience = NULL
 )
 }
 \arguments{
@@ -21,6 +22,10 @@ The other criteria need a covariance structure, which ByFours does not produce.}
 
 \item{return_all}{a boolean. If TRUE, return the list of every candidate path from the node search instead of the selected one.
 Used by \code{\link[=getEstimatedPaths_FullFours]{getEstimatedPaths_FullFours()}}.}
+
+\item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
+Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
+This is faster, but it can miss a better model that only appears after a long run without improvement.}
 }
 \value{
 an EstimatedPath object.

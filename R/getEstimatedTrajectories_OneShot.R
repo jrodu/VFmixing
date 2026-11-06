@@ -127,9 +127,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
     stop("quad_nodes must be a positive whole number.", call. = FALSE)
   }
 
-  if(!is.null(patience) && (length(patience) != 1 || !is.numeric(patience) || patience < 1 || patience != round(patience))){
-    stop("patience must be NULL or a positive whole number.", call. = FALSE)
-  }
+  checkPatience(patience)
 
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
 

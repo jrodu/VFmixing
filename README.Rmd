@@ -78,7 +78,10 @@ The criterion used to choose the nodes can be changed with
 `Model_Selection_Type`. `"BIC"` (the default) and `"AIC"` are applied directly
 to the "ByFours" candidates, so they stay fast. The covariance-based criteria
 (`"BICVel"`, `"VarPos"`, `"VarVel"` and `"VarPosVel"`) need a full regression
-on every candidate, so they are slower.
+on every candidate, so they are slower. Every path method also takes a
+`patience` argument, which stops the search once that many candidates in a row
+fail to improve the criterion (see Step 2 for an example). It makes the biggest
+difference with the slower criteria and with `getEstimatedPaths_FullRegression()`.
 
 ```{r, results = "hide"}
 PathTime <- system.time(

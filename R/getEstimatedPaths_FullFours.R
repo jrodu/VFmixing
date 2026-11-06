@@ -23,12 +23,20 @@
 #'   slower (one full regression per candidate) but still avoids the
 #'   FullRegression node search.
 #'
+#' `patience` stops the search once that many candidates in a row have failed
+#' to improve the criterion. With `"BIC"` or `"AIC"` it stops the ByFours node
+#' search; with the covariance-based criteria the (cheap) node search always
+#' runs in full and `patience` stops the full regressions on its candidates.
+#'
 #' @param Data a numeric n x (d+1) data frame or matrix. The first column is time with the following each dimension's position.
 #' @param nsplits a numeric scalar. The maximum number of splits the ByFours step can split into.
 #' @param V_Smooth a boolean. TRUE if the final spline should have C2 smoothness. FALSE if C1.
 #' The ByFours node search always uses C1 smoothness.
 #' @param Model_Selection_Type a string. The model criterion.
 #' Must pick from the following: BIC, AIC, BICVel, VarPos, VarVel, VarPosVel. See Details.
+#' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is considered.
+#' Otherwise, stop after this many consecutive candidates that do not improve the selection criterion. See Details.
+#' This is faster, but it can miss a better model that only appears after a long run without improvement.
 #'
 #' @returns an EstimatedPath object, with the same elements as one from
 #' [getEstimatedPaths_FullRegression()].
@@ -38,13 +46,10 @@
 #' ExEstPath_FullFours <- getEstimatedPaths_FullFours(ExData, nsplits = 100)
 #' coverageRatePath(ExEstPath_FullFours, ExData, CL = 0.95)
 #'
-getEstimatedPaths_FullFours = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC"){
+getEstimatedPaths_FullFours = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC", patience = NULL){
 
-  valid_types = c("BIC", "AIC", "BICVel", "VarPos", "VarVel", "VarPosVel")
-
-  if(length(Model_Selection_Type) != 1 || !(Model_Selection_Type %in% valid_types)){
-    stop("Model_Selection_Type must be one of: ", paste(valid_types, collapse = ", "), call. = FALSE)
-  }
+  checkPathSelectionType(Model_Selection_Type)
+  checkPatience(patience)
 
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
@@ -55,10 +60,14 @@ getEstimatedPaths_FullFours = function(Data, nsplits, V_Smooth = F, Model_Select
              error = function(e){NULL})
   }
 
-  # Step 1: ByFours node search
-  candidates = getEstimatedPaths_ByFours(Data = Data, nsplits = nsplits, return_all = T)
+  fast_type = Model_Selection_Type %in% c("BIC", "AIC")
 
-  if(Model_Selection_Type %in% c("BIC", "AIC")){
+  # Step 1: ByFours node search (patience applies here only for BIC/AIC)
+  candidates = getEstimatedPaths_ByFours(Data = Data, nsplits = nsplits, return_all = T,
+                                         Model_Selection_Type = if(fast_type) Model_Selection_Type else "BIC",
+                                         patience = if(fast_type) patience else NULL)
+
+  if(fast_type){
 
     # Step 2: choose among the ByFours candidates, then one full regression
     time_splits = getBestSplitsPath(candidates, show = F, V_Smooth = F, type = Model_Selection_Type)$TimeSplits
@@ -72,15 +81,30 @@ getEstimatedPaths_FullFours = function(Data, nsplits, V_Smooth = F, Model_Select
 
   } else{
 
-    # Step 2: a full regression on every candidate, then choose among those
-    full_fits = lapply(candidates, function(cand){fitFull(cand$TimeSplits)})
-    full_fits = full_fits[!vapply(full_fits, is.null, logical(1))]
+    # Step 2: a full regression on each candidate, then choose among those
+    tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth)
+    full_fits = list()
+
+    for(cand in candidates){
+      fit = fitFull(cand$TimeSplits)
+      if(is.null(fit)){
+        next
+      }
+      full_fits[[length(full_fits) + 1]] = fit
+      if(!is.null(patience) && tracker$add(fit)){
+        break
+      }
+    }
 
     if(length(full_fits) == 0){
       stop("The full regression was singular for every ByFours candidate. Try a smaller nsplits.", call. = FALSE)
     }
 
-    EstPath = getBestSplitsPath(full_fits, show = F, V_Smooth = V_Smooth, type = Model_Selection_Type)
+    EstPath = if(is.null(patience)){
+      getBestSplitsPath(full_fits, show = F, V_Smooth = V_Smooth, type = Model_Selection_Type)
+    } else{
+      selectBestPath(full_fits, tracker$values(), Model_Selection_Type)
+    }
 
   }
 

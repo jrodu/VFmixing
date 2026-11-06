@@ -8,7 +8,8 @@ getEstimatedPaths_FullRegression(
   Data,
   nsplits,
   V_Smooth = F,
-  Model_Selection_Type = "BIC"
+  Model_Selection_Type = "BIC",
+  patience = NULL
 )
 }
 \arguments{
@@ -20,6 +21,10 @@ getEstimatedPaths_FullRegression(
 
 \item{Model_Selection_Type}{a string. The model criterion.
 Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.}
+
+\item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
+Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
+This is faster, but it can miss a better model that only appears after a long run without improvement.}
 }
 \value{
 an EstimatedPath object.

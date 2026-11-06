@@ -75,6 +75,9 @@ runEstPathStep_FullRegression = function(Data, time_splits, V_Smooth = T){
 #' @param V_Smooth a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.
 #' @param Model_Selection_Type a string. The model criterion. 
 #' Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel. 
+#' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
+#' Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
+#' This is faster, but it can miss a better model that only appears after a long run without improvement.
 #'
 #' @returns an EstimatedPath object.
 #' @export
@@ -82,7 +85,12 @@ runEstPathStep_FullRegression = function(Data, time_splits, V_Smooth = T){
 #' @examples
 #' getEstimatedPaths_FullRegression(ExData, 100, FALSE, "BIC")
 #'
-getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC"){
+getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC", patience = NULL){
+  
+  checkPathSelectionType(Model_Selection_Type)
+  checkPatience(patience)
+  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth)
+  
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
@@ -92,6 +100,10 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
   all_splits_est_path = list()
   
   all_splits_est_path[[1]] = runEstPathStep_FullRegression(Data, time_splits, V_Smooth)
+  
+  if(!is.null(patience)){
+    tracker$add(all_splits_est_path[[1]])
+  }
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
@@ -123,6 +135,10 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
       post_len = length(all_splits_est_path)
       svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
       
+      if(!is.null(patience) && tracker$add(all_splits_est_path[[length(all_splits_est_path)]])){
+        break
+      }
+      
       if(post_len == pre_len){
         break
       }
@@ -134,7 +150,11 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
     }
   }
   
+  if(!is.null(patience)){
+    # The candidates were already scored while searching.
+    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type))
+  }
+  
   getBestSplitsPath(EstPath = all_splits_est_path, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
   
 }
-

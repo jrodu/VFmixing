@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x0000027cf87616d0>
+#> <bytecode: 0x000002019179e510>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -82,7 +82,10 @@ The criterion used to choose the nodes can be changed with
 directly to the “ByFours” candidates, so they stay fast. The
 covariance-based criteria (`"BICVel"`, `"VarPos"`, `"VarVel"` and
 `"VarPosVel"`) need a full regression on every candidate, so they are
-slower.
+slower. Every path method also takes a `patience` argument, which stops
+the search once that many candidates in a row fail to improve the
+criterion (see Step 2 for an example). It makes the biggest difference
+with the slower criteria and with `getEstimatedPaths_FullRegression()`.
 
 ``` r
 PathTime <- system.time(
@@ -95,7 +98,7 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.31    0.00    0.31
+#>    0.26    0.05    0.31
 ```
 
 ``` r
@@ -153,7 +156,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>    5.52    0.17    5.77
+#>   12.75    0.36   13.79
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -174,7 +177,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.02    0.02    0.05
+#>    0.09    0.00    0.09
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
