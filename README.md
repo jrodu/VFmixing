@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x000002019179e510>
+#> <bytecode: 0x00000225f3717ce8>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -98,8 +98,15 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.26    0.05    0.31
+#>    0.25    0.04    0.29
 ```
+
+Because the “FullFours” path has a covariance structure, the plot can
+show its uncertainty. By default these are 95% prediction intervals for
+a new observation: the uncertainty in the fitted path plus the
+observation noise (`P_Int = FALSE` shows a confidence interval for the
+path itself instead). When both axes are positions, they are drawn as
+ellipses at evenly spaced times:
 
 ``` r
 visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
@@ -107,6 +114,29 @@ visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
 ```
 
 <img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
+
+With time on one axis, the interval is drawn as a band:
+
+``` r
+visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
+                 x_var = 't', y_var = 'X1')
+```
+
+<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+
+We can also check how well this uncertainty is calibrated.
+`coverageRatePath()` uses the same 95% prediction intervals at each data
+time and reports, for each dimension, the share of data points that fall
+inside them.
+
+``` r
+PathCovRate = coverageRatePath(EstPath = EstPath, Data = Data, CL = 0.95)
+PathCovRate
+#> [1] 0.9441118 0.9620758
+```
+
+The coverage rates for X1 and X2 are 94.4% and 96.2%, close to the
+nominal 95%.
 
 This estimated path is also included in the package as
 `ExEstPath_FullFours`.
@@ -156,7 +186,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>   12.75    0.36   13.79
+#>   11.20    0.29   11.71
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -177,7 +207,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.09    0.00    0.09
+#>    0.04    0.00    0.06
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
@@ -192,7 +222,7 @@ visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                  CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
 ```
 
-<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />
 
 In the plot above, we can see our estimate of the trajectory (solid
 line) next to the true trajectories used to construct the data (dashed
