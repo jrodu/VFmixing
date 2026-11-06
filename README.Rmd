@@ -66,13 +66,19 @@ The "FullFours" method works in two stages:
 
 1. The fast "ByFours" algorithm searches for the spline nodes. Each time a
    region is split, only the four neighboring segments are refit, so the
-   search is extremely fast. The number of nodes is chosen by BIC.
+   search is extremely fast. By default, the number of nodes is chosen by BIC.
 2. A single full regression is then fit on the selected nodes. This gives
    stable estimates and an estimable covariance structure for the path.
 
 The result is the speed of "ByFours" together with the covariance structure
 needed for confidence intervals, random path draws, and the "One-Shot"
 trajectory method below.
+
+The criterion used to choose the nodes can be changed with
+`Model_Selection_Type`. `"BIC"` (the default) and `"AIC"` are applied directly
+to the "ByFours" candidates, so they stay fast. The covariance-based criteria
+(`"BICVel"`, `"VarPos"`, `"VarVel"` and `"VarPosVel"`) need a full regression
+on every candidate, so they are slower.
 
 ```{r, results = "hide"}
 EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
