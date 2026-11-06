@@ -28,7 +28,8 @@ getEstimatedTrajectories_ByFours(
 \item{Random_Path}{a boolean. TRUE if the path used to construct the trajectory data set should be drawn at random.
 If TRUE, the path must've been estimated using the FullRegression or Projection methods.}
 
-\item{Path_V_Smooth}{a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only needed if Random_Path = TRUE.}
+\item{Path_V_Smooth}{a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only used if Random_Path = TRUE.
+If missing, it is detected from EstPath.}
 }
 \value{
 an EstimatedTrajectory object.

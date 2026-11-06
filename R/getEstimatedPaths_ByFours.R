@@ -6,6 +6,10 @@
 #'
 #' @param Data a numeric n x (d+1) data frame or matrix. The first column is time with the following each dimension's position.
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
+#' @param Model_Selection_Type a string. The model criterion, "BIC" or "AIC". 
+#' The other criteria need a covariance structure, which ByFours does not produce.
+#' @param return_all a boolean. If TRUE, return the list of every candidate path from the node search instead of the selected one. 
+#' Used by [getEstimatedPaths_FullFours()].
 #'
 #' @returns an EstimatedPath object. 
 #' @export
@@ -13,7 +17,12 @@
 #' @examples
 #' getEstimatedPaths_ByFours(ExData, 100)
 #' 
-getEstimatedPaths_ByFours = function(Data, nsplits){
+getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC", return_all = F){
+  
+  if(!(Model_Selection_Type %in% c("BIC", "AIC"))){
+    stop("Model_Selection_Type must be \"BIC\" or \"AIC\" for the ByFours method.", call. = FALSE)
+  }
+  
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
@@ -86,7 +95,7 @@ getEstimatedPaths_ByFours = function(Data, nsplits){
   
   Error_mat = cbind(t = cur_Data$t,(cur_Data[,-1] - est_pos)^2)
   
-  all_splits_est_path[[1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = 3, PosSplits = pos_splits)
+  all_splits_est_path[[1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = 4, PosSplits = pos_splits)
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
@@ -448,7 +457,7 @@ getEstimatedPaths_ByFours = function(Data, nsplits){
     
     pos_splits = unname(table(split_labels_unique) >= 8)
     
-    all_splits_est_path[[length(all_splits_est_path)+1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = length(est_path) - 1, PosSplits = pos_splits)
+    all_splits_est_path[[length(all_splits_est_path)+1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = length(est_path), PosSplits = pos_splits)
     
     svMisc::progress(length(est_path) - 1, max.value = nsplits, progress.bar = T, console = T)
     
@@ -458,6 +467,10 @@ getEstimatedPaths_ByFours = function(Data, nsplits){
     
   }
   
-  getBestSplitsPath(all_splits_est_path, show = F, V_Smooth = F, type = "BIC")
+  if(return_all){
+    return(all_splits_est_path)
+  }
+  
+  getBestSplitsPath(all_splits_est_path, show = F, V_Smooth = F, type = Model_Selection_Type)
   
 }

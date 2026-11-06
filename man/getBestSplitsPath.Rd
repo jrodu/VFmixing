@@ -4,7 +4,7 @@
 \alias{getBestSplitsPath}
 \title{Path Model Selection}
 \usage{
-getBestSplitsPath(EstPath, show, V_Smooth = T, type = "BIC")
+getBestSplitsPath(EstPath, show = F, V_Smooth = T, type = "BIC")
 }
 \arguments{
 \item{EstPath}{a list of EstimatedPath Objects. These should all be related using the same data with an increasing number of splits.}
@@ -15,7 +15,8 @@ getBestSplitsPath(EstPath, show, V_Smooth = T, type = "BIC")
 
 \item{type}{a string. The model criterion.
 Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.
-BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel can only be used with FullRegression and Projection.}
+BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel need a covariance structure,
+so they can only be used with FullRegression, Projection and FullFours.}
 }
 \value{
 an EstimatedPath object.

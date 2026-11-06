@@ -86,27 +86,33 @@ runEstTrajStep_OneShot = function(EstPath, baseVectorFields, TimeSplits, worst_s
 #' @param EstPath an EstimatedPath object.
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
 #' @param baseVectorFields a baseVectorField object.
-#' @param V_Smooth a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.
+#' @param V_Smooth a boolean. TRUE if the trajectory spline should have C2 smoothness. FALSE if C1.
+#' The path's smoothness is detected from EstPath, so it does not need to match.
 #' @param Model_Selection_Type a string. The model criterion. 
-#' Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos. 
+#' Must pick from the following: BIC, BICOS, AIC, VarPos. See [getBestSplitsTraj()].
 #' @param Random_Path a boolean. TRUE if the path used to estimate the trajectories should be randomly generated. 
-#' If TRUE, the path must've been estimated using the FullRegression or Projection method.
+#' If TRUE, the path must've been estimated using the FullRegression, Projection or FullFours method.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
 #' 
 #' @examples
+#' \donttest{
 #' ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
 #'      EstPath = ExEstPath_FullFours, 
 #'      nsplits = 100, baseVectorFields = baseVectorFields, 
-#'      V_Smooth = FALSE, Model_Selection_Type = "BICOS", Random_Path = FALSE)
+#'      V_Smooth = FALSE, Model_Selection_Type = "BIC", Random_Path = FALSE)
+#' }
 #'     
-getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BICOS", Random_Path = F){
+getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F){
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
+  # The path may have been fit with different smoothness than the trajectory.
+  Path_V_Smooth = inferPathVSmooth(EstPath, default = V_Smooth)
+  
   if(Random_Path){
-    EstPath$Path = generateRandomPath(EstPath$Free_Parameters, free_param_cov = EstPath$Free_Parameter_Cov, TimeSplits = EstPath$TimeSplits, V_Smooth = V_Smooth)
+    EstPath$Path = generateRandomPath(EstPath$Free_Parameters, free_param_cov = EstPath$Free_Parameter_Cov, TimeSplits = EstPath$TimeSplits, V_Smooth = Path_V_Smooth)
   }
   
   n_dim = nrow(EstPath$Path[[1]])
@@ -117,7 +123,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   
   all_splits_est_traj = list()
   
-  all_splits_est_traj[[1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = 1, cur_integral_list_traj = list(), cur_integral_list_pathtraj = list(), n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
+  all_splits_est_traj[[1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = 1, cur_integral_list_traj = list(), cur_integral_list_pathtraj = list(), n_dim = n_dim, n_models = n_models, Path_VSmooth = Path_V_Smooth, Traj_VSmooth = V_Smooth)
   
   svMisc::progress(1, max.value = nsplits, progress.bar = T, console = T)
   
@@ -136,7 +142,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
       
       time_splits = c(time_splits[1:worst_split], mean(c(time_splits[worst_split], time_splits[worst_split+1])), time_splits[(worst_split+1):length(time_splits)])
       
-      all_splits_est_traj[[length(all_splits_est_traj)+1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = worst_split, cur_integral_list_traj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_Traj, cur_integral_list_pathtraj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_PathTraj, n_dim = n_dim, n_models = n_models, Path_VSmooth = V_Smooth, Traj_VSmooth = V_Smooth)
+      all_splits_est_traj[[length(all_splits_est_traj)+1]] = runEstTrajStep_OneShot(EstPath = EstPath, baseVectorFields = baseVectorFields, TimeSplits = time_splits, worst_split = worst_split, cur_integral_list_traj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_Traj, cur_integral_list_pathtraj = all_splits_est_traj[[length(all_splits_est_traj)]]$IntegralList_PathTraj, n_dim = n_dim, n_models = n_models, Path_VSmooth = Path_V_Smooth, Traj_VSmooth = V_Smooth)
       
       svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
       

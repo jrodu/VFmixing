@@ -4,10 +4,14 @@
 \alias{visualizeData}
 \title{visualizeData}
 \usage{
-visualizeData(Data)
+visualizeData(Data, x_var = "X1", y_var = "X2")
 }
 \arguments{
 \item{Data}{a numeric data frame. The first column is the time and the remaining columns are the positions.}
+
+\item{x_var}{a string. The variable name to plot on the x-axis. Columns are named t, X1, X2, ...}
+
+\item{y_var}{a string. The variable name to plot on the y-axis.}
 }
 \value{
 a ggplot2 object.
@@ -17,5 +21,6 @@ visualizeData
 }
 \examples{
 visualizeData(ExData)
+visualizeData(ExData, x_var = "t", y_var = "X1")
 
 }

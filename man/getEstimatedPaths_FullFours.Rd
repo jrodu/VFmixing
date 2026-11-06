@@ -4,7 +4,12 @@
 \alias{getEstimatedPaths_FullFours}
 \title{Get Estimated Path using the Full Fours Method}
 \usage{
-getEstimatedPaths_FullFours(Data, nsplits, V_Smooth = F)
+getEstimatedPaths_FullFours(
+  Data,
+  nsplits,
+  V_Smooth = F,
+  Model_Selection_Type = "BIC"
+)
 }
 \arguments{
 \item{Data}{a numeric n x (d+1) data frame or matrix. The first column is time with the following each dimension's position.}
@@ -13,6 +18,9 @@ getEstimatedPaths_FullFours(Data, nsplits, V_Smooth = F)
 
 \item{V_Smooth}{a boolean. TRUE if the final spline should have C2 smoothness. FALSE if C1.
 The ByFours node search always uses C1 smoothness.}
+
+\item{Model_Selection_Type}{a string. The model criterion.
+Must pick from the following: BIC, AIC, BICVel, VarPos, VarVel, VarPosVel. See Details.}
 }
 \value{
 an EstimatedPath object, with the same elements as one from
@@ -20,15 +28,28 @@ an EstimatedPath object, with the same elements as one from
 }
 \description{
 A hybrid of the ByFours and FullRegression path methods. The ByFours
-algorithm is run first to quickly choose the spline nodes (selected by BIC).
-A single full cubic spline regression is then fit on those nodes, which
-gives the stable estimates and the estimable covariance structure of the
-FullRegression method at close to the computational cost of ByFours.
+algorithm is run first to quickly search for the spline nodes. A full cubic
+spline regression is then fit on the selected nodes, which gives the stable
+estimates and the estimable covariance structure of the FullRegression
+method at close to the computational cost of ByFours.
 
 Because the final fit is a FullRegression fit, the result can be used
 anywhere a FullRegression or Projection path is required, for example
 \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}, \code{\link[=coverageRatePath]{coverageRatePath()}},
 \code{\link[=getRandomEstPathPosition]{getRandomEstPathPosition()}} or \code{Random_Path = TRUE}.
+}
+\details{
+How the nodes are chosen depends on \code{Model_Selection_Type}:
+\itemize{
+\item \code{"BIC"} or \code{"AIC"}: the criterion is applied to the ByFours candidates
+directly, and one full regression is fit on the chosen nodes. This is the
+fast option.
+\item \code{"BICVel"}, \code{"VarPos"}, \code{"VarVel"} or \code{"VarPosVel"}: these criteria need a
+covariance structure, so a full regression is fit on the nodes of every
+ByFours candidate and the criterion is applied to those fits. This is
+slower (one full regression per candidate) but still avoids the
+FullRegression node search.
+}
 }
 \examples{
 ExEstPath_FullFours <- getEstimatedPaths_FullFours(ExData, nsplits = 100)

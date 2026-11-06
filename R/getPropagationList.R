@@ -23,7 +23,18 @@ getPropagationList = function(Path, TrajList, baseVectorFields, prop_t_grid_size
   t_seq = seq(min(Path$TimeSplits), max(Path$TimeSplits), by = prop_t_grid_size)
   
   PathData = data.frame(cbind(t_seq, getEstPathPosition(t_seq, Path)))
-  names(PathData) = c("Time","Longitude","Latitude")
+  n_dim = ncol(PathData) - 1
+  
+  # Two-dimensional paths keep the Longitude/Latitude names used by drifterVisualizationTool.
+  if(n_dim == 2){
+    dim_names = c("Longitude", "Latitude")
+    method_dim_names = c("LonM", "LatM")
+  } else{
+    dim_names = stringr::str_c("X", 1:n_dim)
+    method_dim_names = stringr::str_c("X", 1:n_dim, "M")
+  }
+  
+  names(PathData) = c("Time", dim_names)
   
   RK_ints = diff(PathData$Time)
   
@@ -39,7 +50,7 @@ getPropagationList = function(Path, TrajList, baseVectorFields, prop_t_grid_size
     
     # 2. Loop through each trajectory method.
     for (j in 1:n_methods) {
-      cur_RK = RungeKutta(startTime = PathData$Time[k], startPos = c(PathData[k,2],PathData[k,3]),
+      cur_RK = RungeKutta(startTime = PathData$Time[k], startPos = unlist(PathData[k, -1]),
                           baseVectorFields = baseVectorFields, 
                           TrajList = TrajList[[j]]$Traj, 
                           TrajTimeSplits = TrajList[[j]]$TimeSplits, 
@@ -66,7 +77,7 @@ getPropagationList = function(Path, TrajList, baseVectorFields, prop_t_grid_size
     PropagationList[[2]][[k]] = combined_RK_step
     
     # 4. Create column names dynamically.
-    names(PropagationList[[2]][[k]]) = c('time', paste0(c("LonM", "LatM"), rep(1:n_methods, each = 2)))
+    names(PropagationList[[2]][[k]]) = c('time', paste0(method_dim_names, rep(1:n_methods, each = n_dim)))
     
     svMisc::progress(k, length(RK_ints))
   }
@@ -84,7 +95,7 @@ getPropagationList = function(Path, TrajList, baseVectorFields, prop_t_grid_size
   PropagationList[[1]] = cbind(est_pos_dfs[[1]][, 1, drop = FALSE], do.call(cbind, diff_list))
   
   # 7. Set the final column names dynamically.
-  colnames(PropagationList[[1]]) = c('Time', paste0(c("LonM", "LatM"), rep(1:n_methods, each=2)))
+  colnames(PropagationList[[1]]) = c('Time', paste0(method_dim_names, rep(1:n_methods, each = n_dim)))
   
   PropagationList
 }

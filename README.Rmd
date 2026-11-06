@@ -133,7 +133,7 @@ In the plot above, we can see our estimate of the trajectory (solid line)
 next to the true trajectories used to construct the data (dashed line).
 We can evaluate the method's performance more formally using the average
 squared distance between the estimated trajectories and the truth, as well as
-the coverage rate of the trajectories' 95% intervals.
+the coverage rate of each trajectory's 95% intervals.
 
 ```{r}
 AvgSqDist = cubicAvgSquareDist(EstCubic = EstTraj$Traj,
@@ -150,6 +150,7 @@ TrajCovRate = coverageRateTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
 TrajCovRate
 ```
 
-The average squared distance is extremely small, and the coverage rate is
-`r round(100*TrajCovRate, 1)`%, `r if (TrajCovRate >= 0.95) "at or above the nominal 95%" else "below the nominal 95%"`.
-`r if (TrajCovRate >= 0.95) "For this example the intervals are, if anything, conservative." else "This suggests the assumption that the mixing vector fields are constant within the error region of a data point is not fully met for this data."`
+The average squared distance is extremely small, and the coverage rates for the
+two trajectories are `r paste0(round(100*TrajCovRate, 1), "%", collapse = " and ")`,
+`r if (all(TrajCovRate >= 0.95)) "at or above the nominal 95%" else "with at least one below the nominal 95%"`.
+`r if (all(TrajCovRate >= 0.95)) "For this example the intervals are, if anything, conservative." else "This suggests the assumption that the mixing vector fields are constant within the error region of a data point is not fully met for this data."`

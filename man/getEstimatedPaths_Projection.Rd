@@ -7,8 +7,8 @@
 getEstimatedPaths_Projection(
   Data,
   nsplits,
-  V_Smooth = T,
-  Model_Selection_Type = "VarPosVel"
+  V_Smooth = F,
+  Model_Selection_Type = "BIC"
 )
 }
 \arguments{
@@ -28,6 +28,8 @@ an EstimatedPath object.
 getEstimatedPaths_Projection
 }
 \examples{
-getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC") 
+\donttest{
+getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC")
+}
 
 }
