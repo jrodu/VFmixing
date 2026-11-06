@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x000001b589766508>
+#> <bytecode: 0x000002c83a74c620>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -98,7 +98,7 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.18    0.08    0.32
+#>    0.30    0.02    0.31
 ```
 
 Because the “FullFours” path has a covariance structure, the plot can
@@ -186,7 +186,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>   11.74    0.11   12.17
+#>    5.50    0.16    5.75
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -207,7 +207,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.08    0.00    0.08
+#>    0.03    0.00    0.04
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
@@ -219,7 +219,7 @@ TrueTraj <- VFmixing::ExTraj
 visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                  TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = EstPath,
                  baseVectorFields = baseVectorFields, t_grid_size = 0.01,
-                 CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
+                 CL = 0.95, Cos_Cutoff = 0.91)
 ```
 
 <img src="man/figures/README-unnamed-chunk-13-1.png" width="100%" />

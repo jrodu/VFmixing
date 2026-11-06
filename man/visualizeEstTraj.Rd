@@ -12,7 +12,6 @@ visualizeEstTraj(
   baseVectorFields,
   t_grid_size = 0.01,
   CL = 0.95,
-  P_Int = T,
   Cos_Cutoff = 0.91
 )
 }
@@ -29,10 +28,9 @@ visualizeEstTraj(
 
 \item{t_grid_size}{a positive numeric scalar. The time grid size of the plotting.}
 
-\item{CL}{a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the OneShot method.}
-
-\item{P_Int}{a boolean. TRUE if the prediction interval should be plotted. FALSE if the confidence interval on the mean should be plotted.
-Only used if EstTraj was estimated using the OneShot method.}
+\item{CL}{a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the OneShot method.
+The bands are confidence intervals from the trajectory coefficient covariance. There is no prediction interval:
+the trajectories are never observed directly, and the OneShot \eqn{\sigma^2} describes the velocity residuals.}
 
 \item{Cos_Cutoff}{a real number between 0 and 1. The cosine value to determine the cutoff for when vector fields are too colinear.}
 }

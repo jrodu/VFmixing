@@ -199,7 +199,7 @@ TrueTraj <- VFmixing::ExTraj
 visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                  TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = EstPath,
                  baseVectorFields = baseVectorFields, t_grid_size = 0.01,
-                 CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
+                 CL = 0.95, Cos_Cutoff = 0.91)
 ```
 
 In the plot above, we can see our estimate of the trajectory (solid line)

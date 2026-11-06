@@ -4,15 +4,12 @@
 \alias{avgCIWidthTraj}
 \title{avgCIWidthTraj}
 \usage{
-avgCIWidthTraj(EstTraj, CL = 0.95, P_Int = F, t_grid_size = 0.01)
+avgCIWidthTraj(EstTraj, CL = 0.95, t_grid_size = 0.01)
 }
 \arguments{
 \item{EstTraj}{an EstimatedTrajectory object with a covariance structure (OneShot).}
 
 \item{CL}{a real number between 0 and 1. The confidence level of the intervals.}
-
-\item{P_Int}{a boolean. FALSE (the default) for confidence intervals on the trajectories,
-TRUE to add the trajectory \eqn{\sigma^2} as in the prediction intervals of \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}.}
 
 \item{t_grid_size}{a positive numeric scalar. The spacing of the time grid the widths are averaged over.}
 }
@@ -20,17 +17,21 @@ TRUE to add the trajectory \eqn{\sigma^2} as in the prediction intervals of \cod
 a named numeric vector. The average interval width for each trajectory.
 }
 \description{
-The average width of an estimated trajectory's confidence (or prediction)
-intervals over time, for each trajectory.
+The average width of an estimated trajectory's confidence intervals over
+time, for each trajectory.
 }
 \details{
 At time \eqn{t} the interval for trajectory \eqn{m} has width
 \eqn{2 z \sqrt{b(t)^T \Sigma_m b(t)}}, where \eqn{b(t)} is the cubic basis,
 \eqn{\Sigma_m} that trajectory's block of the coefficient covariance and
-\eqn{z} the normal quantile for \code{CL}. With \code{P_Int = TRUE} the trajectory's
-\eqn{\sigma^2} is added under the square root, as in \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}.
-The widths are averaged over an evenly spaced time grid, so this is a
-time-average across the whole trajectory.
+\eqn{z} the normal quantile for \code{CL}. These are the intervals drawn by
+\code{\link[=visualizeEstTraj]{visualizeEstTraj()}} and checked by \code{\link[=coverageRateTraj]{coverageRateTraj()}}. The widths are
+averaged over an evenly spaced time grid, so this is a time-average across
+the whole trajectory.
+
+There is no prediction-interval option: the trajectories are never observed
+directly, and the OneShot \eqn{\sigma^2} is the variance of the velocity
+residuals, not of a trajectory value.
 }
 \examples{
 avgCIWidthTraj(ExEstTraj_OneShot, CL = 0.95)

@@ -7,8 +7,8 @@
 #' @param baseVectorFields a baseVectorFieldFunction.
 #' @param t_grid_size a positive numeric scalar. The time grid size of the plotting.
 #' @param CL a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the OneShot method.
-#' @param P_Int a boolean. TRUE if the prediction interval should be plotted. FALSE if the confidence interval on the mean should be plotted.
-#' Only used if EstTraj was estimated using the OneShot method.
+#' The bands are confidence intervals from the trajectory coefficient covariance. There is no prediction interval:
+#' the trajectories are never observed directly, and the OneShot \eqn{\sigma^2} describes the velocity residuals.
 #' @param Cos_Cutoff a real number between 0 and 1. The cosine value to determine the cutoff for when vector fields are too colinear. 
 #'
 #' @returns a ggplot2 object.
@@ -21,7 +21,7 @@
 #' #                  baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
 #' #                  Cos_Cutoff = 0.91)
 #'   
-visualizeEstTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, EstPath, baseVectorFields, t_grid_size = 0.01, CL = 0.95, P_Int = T, Cos_Cutoff = 0.91){
+visualizeEstTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, EstPath, baseVectorFields, t_grid_size = 0.01, CL = 0.95, Cos_Cutoff = 0.91){
   
   n_models = nrow(EstTraj$Traj[[1]])
   n_dim = nrow(EstPath$Path[[1]])
@@ -60,7 +60,7 @@ visualizeEstTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, EstPath, base
       cur_difft = t - TimeSplits_Traj[cur_traj_index]
       trans_mat = matrix(rep(c(cur_difft^3,cur_difft^2,cur_difft,1), n_models), nrow = 4)
       
-      cur_y_var = apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1] + (EstTraj$Sigma2[[cur_traj_index]])*P_Int})
+      cur_y_var = apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1]})
       
       upper = cur_traj + stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       lower = cur_traj - stats::qnorm((1+CL)/2)*sqrt(cur_y_var)

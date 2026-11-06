@@ -166,14 +166,13 @@ trajSelectionCriterion = function(EstTrajList, EstPath, type, V_Smooth){
       n_models = nrow(cur_traj$Traj[[1]])
       TimeSplits = cur_traj$TimeSplits
       Cov = cur_traj$Cov
-      Sigma2 = cur_traj$Sigma2
       
       evaluateIndividualTraj = function(t){
         cur_traj_index = min(c(max(c(sum((TimeSplits - t)<0),1)), length(TimeSplits)-1))
         cur_difft = t - TimeSplits[cur_traj_index]
         trans_mat = matrix(c(cur_difft^3,cur_difft^2,cur_difft,1), nrow = 4)
         
-        (mean(apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1] + Sigma2[[cur_traj_index]]})))
+        (mean(apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1]})))
         
       }
       

@@ -231,6 +231,7 @@ coverageRatePath = function(EstPath, Data, CL = 0.95){
 #' @param TrueTraj a list of numeric matrices. The list of coefficient matrices of a true trajectory.
 #' @param TrueTrajTimeSplits a numeric vector. The nodes of the true trajectory in addition with the starting and ending time.
 #' @param CL a real number between 0 and 1. The confidence level of the intervals to check the coverage rate.
+#' The intervals are confidence intervals from the trajectory coefficient covariance.
 #'
 #' @returns a numeric vector. Each entry corresponds to the coverage rate for a given model
 #' @export
@@ -265,7 +266,8 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
     
     for(j in 1:n_models){
       
-      cur_y_var = (t(trans_mat) %*% Cov[[cur_est_traj_index]][1:4 + (j-1)*4, 1:4 + (j-1)*4] %*% trans_mat)[1,1] + (EstTraj$Sigma2[[cur_est_traj_index]])
+      # Confidence interval: the trajectories are not observed, so no noise term is added
+      cur_y_var = (t(trans_mat) %*% Cov[[cur_est_traj_index]][1:4 + (j-1)*4, 1:4 + (j-1)*4] %*% trans_mat)[1,1]
       upper = est_traj[j] + stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       lower = est_traj[j] - stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       
@@ -397,22 +399,24 @@ avgCIWidthPath = function(EstPath, CL = 0.95, P_Int = F, t_grid_size = 0.01){
 #' avgCIWidthTraj
 #'
 #' @description
-#' The average width of an estimated trajectory's confidence (or prediction)
-#' intervals over time, for each trajectory.
+#' The average width of an estimated trajectory's confidence intervals over
+#' time, for each trajectory.
 #'
 #' @details
 #' At time \eqn{t} the interval for trajectory \eqn{m} has width
 #' \eqn{2 z \sqrt{b(t)^T \Sigma_m b(t)}}, where \eqn{b(t)} is the cubic basis,
 #' \eqn{\Sigma_m} that trajectory's block of the coefficient covariance and
-#' \eqn{z} the normal quantile for `CL`. With `P_Int = TRUE` the trajectory's
-#' \eqn{\sigma^2} is added under the square root, as in [visualizeEstTraj()].
-#' The widths are averaged over an evenly spaced time grid, so this is a
-#' time-average across the whole trajectory.
+#' \eqn{z} the normal quantile for `CL`. These are the intervals drawn by
+#' [visualizeEstTraj()] and checked by [coverageRateTraj()]. The widths are
+#' averaged over an evenly spaced time grid, so this is a time-average across
+#' the whole trajectory.
+#'
+#' There is no prediction-interval option: the trajectories are never observed
+#' directly, and the OneShot \eqn{\sigma^2} is the variance of the velocity
+#' residuals, not of a trajectory value.
 #'
 #' @param EstTraj an EstimatedTrajectory object with a covariance structure (OneShot).
 #' @param CL a real number between 0 and 1. The confidence level of the intervals.
-#' @param P_Int a boolean. FALSE (the default) for confidence intervals on the trajectories,
-#' TRUE to add the trajectory \eqn{\sigma^2} as in the prediction intervals of [visualizeEstTraj()].
 #' @param t_grid_size a positive numeric scalar. The spacing of the time grid the widths are averaged over.
 #'
 #' @returns a named numeric vector. The average interval width for each trajectory.
@@ -421,7 +425,7 @@ avgCIWidthPath = function(EstPath, CL = 0.95, P_Int = F, t_grid_size = 0.01){
 #' @examples
 #' avgCIWidthTraj(ExEstTraj_OneShot, CL = 0.95)
 #'
-avgCIWidthTraj = function(EstTraj, CL = 0.95, P_Int = F, t_grid_size = 0.01){
+avgCIWidthTraj = function(EstTraj, CL = 0.95, t_grid_size = 0.01){
 
   checkIntervalArgs(CL, t_grid_size)
 
@@ -445,7 +449,7 @@ avgCIWidthTraj = function(EstTraj, CL = 0.95, P_Int = F, t_grid_size = 0.01){
     Bs = B[sel, , drop = FALSE]
     for(m in seq_len(n_models)){
       block = EstTraj$Cov[[r]][1:4 + (m - 1)*4, 1:4 + (m - 1)*4]
-      variance[sel, m] = rowSums((Bs %*% block) * Bs) + P_Int*EstTraj$Sigma2[[r]]
+      variance[sel, m] = rowSums((Bs %*% block) * Bs)
     }
   }
 

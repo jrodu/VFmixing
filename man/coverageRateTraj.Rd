@@ -13,7 +13,8 @@ coverageRateTraj(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95)
 
 \item{TrueTrajTimeSplits}{a numeric vector. The nodes of the true trajectory in addition with the starting and ending time.}
 
-\item{CL}{a real number between 0 and 1. The confidence level of the intervals to check the coverage rate.}
+\item{CL}{a real number between 0 and 1. The confidence level of the intervals to check the coverage rate.
+The intervals are confidence intervals from the trajectory coefficient covariance.}
 }
 \value{
 a numeric vector. Each entry corresponds to the coverage rate for a given model
