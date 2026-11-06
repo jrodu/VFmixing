@@ -137,7 +137,7 @@
 #'   \item{IntegralList_PathTraj}{A list of matrices used to transform the path coefficients into the trajectory coefficients.}
 #' }
 #' 
-#' @source The example in the getEstimatedTrajectories_OneShot function.
+#' @source `getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields)`
 "ExEstTraj_OneShot"
 
 #' Example PropagationList
@@ -153,3 +153,26 @@
 #' 
 #' @source The example in the getPropagationList function.
 "ExPropagationList"
+
+#' Example Estimated Path
+#'
+#' A path estimated using the FullFours method.
+#'
+#' @format ## `ExEstPath_FullFours`
+#' A list with 11 elements: 
+#' \describe{
+#'   \item{Path}{A list of cubic coefficient matrices.}
+#'   \item{TimeSplits}{A vector of node, starting, and ending times.}
+#'   \item{Error}{A matrix with the squared residuals in each dimension for each data point.}
+#'   \item{n_splits}{The number of regions in the cubic spline.}
+#'   \item{PosSplits}{A vector of boolean describing which regions in the spline can be split in the next iteration.}
+#'   \item{Cov}{A list of lists containing covariance matrices for each region and dimension of the cubic spline coefficients.}
+#'   \item{Sigma2}{A list of vectors containing the sigma2 estimates for each region and dimension of the cubic spline.}
+#'   \item{SplitLabels}{A factor vector describing which region of the spline each data point lies.}
+#'   \item{FullCov}{A list a covariance matrices for the cubic spline coefficients for each dimension.}
+#'   \item{Free_Parameters}{A matrix containing the estimates of the free coefficients for each dimension's spline.}
+#'   \item{Free_Parameter_Cov}{A list of covariance matrices for the free coefficients for each dimension's spline.}
+#' }
+#' 
+#' @source `getEstimatedPaths_FullFours(ExData, nsplits = 100)`
+"ExEstPath_FullFours"

@@ -97,7 +97,7 @@ runEstTrajStep_OneShot = function(EstPath, baseVectorFields, TimeSplits, worst_s
 #' 
 #' @examples
 #' ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
-#'      EstPath = ExEstPath_Projection, 
+#'      EstPath = ExEstPath_FullFours, 
 #'      nsplits = 100, baseVectorFields = baseVectorFields, 
 #'      V_Smooth = FALSE, Model_Selection_Type = "BICOS", Random_Path = FALSE)
 #'     

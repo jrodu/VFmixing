@@ -302,7 +302,7 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
 #' 
 #' @examples
 #' avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_OneShot, 
-#'             Path = ExEstPath_Projection, upper = 5, lower = 0)
+#'             Path = ExEstPath_FullFours, upper = 5, lower = 0)
 #'   
 avgMagError = function(baseVectorFields, Traj, Path, upper, lower){
   
