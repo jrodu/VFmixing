@@ -332,3 +332,141 @@ avgMagError = function(baseVectorFields, Traj, Path, upper, lower){
   
   
 }
+
+#' avgCIWidthPath
+#'
+#' @description
+#' The average width of an estimated path's confidence (or prediction)
+#' intervals over time, for each dimension.
+#'
+#' @details
+#' At time \eqn{t} the interval for dimension \eqn{d} has width
+#' \eqn{2 z \sqrt{b(t)^T \Sigma_d b(t)}}, where \eqn{b(t)} is the cubic basis,
+#' \eqn{\Sigma_d} the coefficient covariance and \eqn{z} the normal quantile for
+#' `CL`. With `P_Int = TRUE` the observation noise \eqn{\sigma^2_d} is added
+#' under the square root, which gives the width of the prediction interval used
+#' by [coverageRatePath()] and [visualizeEstPath()]. The widths are averaged
+#' over an evenly spaced time grid, so this is a time-average across the whole
+#' path.
+#'
+#' @param EstPath an EstimatedPath object with a covariance structure (FullFours, FullRegression or Projection).
+#' @param CL a real number between 0 and 1. The confidence level of the intervals.
+#' @param P_Int a boolean. FALSE (the default) for confidence intervals on the path,
+#' TRUE for prediction intervals (path uncertainty plus observation noise).
+#' @param t_grid_size a positive numeric scalar. The spacing of the time grid the widths are averaged over.
+#'
+#' @returns a named numeric vector. The average interval width for each dimension.
+#' @export
+#'
+#' @examples
+#' avgCIWidthPath(ExEstPath_FullFours, CL = 0.95)
+#' avgCIWidthPath(ExEstPath_FullFours, CL = 0.95, P_Int = TRUE)
+#'
+avgCIWidthPath = function(EstPath, CL = 0.95, P_Int = F, t_grid_size = 0.01){
+
+  checkIntervalArgs(CL, t_grid_size)
+
+  if(is.null(EstPath$Cov) || is.null(EstPath$Sigma2)){
+    stop("EstPath has no covariance structure. Use a FullFours, FullRegression or Projection path.", call. = FALSE)
+  }
+
+  TimeSplits = EstPath$TimeSplits
+  n_dim = nrow(EstPath$Path[[1]])
+  t_seq = seq(min(TimeSplits), max(TimeSplits), by = t_grid_size)
+
+  path = evaluatePathAt(t_seq, EstPath)
+  B = cbind(path$s^3, path$s^2, path$s, 1)
+  variance = matrix(0, length(t_seq), n_dim)
+
+  for(r in unique(path$idx)){
+    sel = path$idx == r
+    Bs = B[sel, , drop = FALSE]
+    for(d in seq_len(n_dim)){
+      variance[sel, d] = rowSums((Bs %*% EstPath$Cov[[r]][[d]]) * Bs) + P_Int*EstPath$Sigma2[[r]][d]
+    }
+  }
+
+  z = stats::qnorm((1 + CL)/2)
+  width = colMeans(2*z*sqrt(pmax(variance, 0)))
+  names(width) = stringr::str_c("X", seq_len(n_dim))
+  width
+
+}
+
+
+#' avgCIWidthTraj
+#'
+#' @description
+#' The average width of an estimated trajectory's confidence (or prediction)
+#' intervals over time, for each trajectory.
+#'
+#' @details
+#' At time \eqn{t} the interval for trajectory \eqn{m} has width
+#' \eqn{2 z \sqrt{b(t)^T \Sigma_m b(t)}}, where \eqn{b(t)} is the cubic basis,
+#' \eqn{\Sigma_m} that trajectory's block of the coefficient covariance and
+#' \eqn{z} the normal quantile for `CL`. With `P_Int = TRUE` the trajectory's
+#' \eqn{\sigma^2} is added under the square root, as in [visualizeEstTraj()].
+#' The widths are averaged over an evenly spaced time grid, so this is a
+#' time-average across the whole trajectory.
+#'
+#' @param EstTraj an EstimatedTrajectory object with a covariance structure (OneShot).
+#' @param CL a real number between 0 and 1. The confidence level of the intervals.
+#' @param P_Int a boolean. FALSE (the default) for confidence intervals on the trajectories,
+#' TRUE to add the trajectory \eqn{\sigma^2} as in the prediction intervals of [visualizeEstTraj()].
+#' @param t_grid_size a positive numeric scalar. The spacing of the time grid the widths are averaged over.
+#'
+#' @returns a named numeric vector. The average interval width for each trajectory.
+#' @export
+#'
+#' @examples
+#' avgCIWidthTraj(ExEstTraj_OneShot, CL = 0.95)
+#'
+avgCIWidthTraj = function(EstTraj, CL = 0.95, P_Int = F, t_grid_size = 0.01){
+
+  checkIntervalArgs(CL, t_grid_size)
+
+  if(is.null(EstTraj$Cov)){
+    stop("EstTraj has no covariance structure. Use a OneShot trajectory.", call. = FALSE)
+  }
+
+  TimeSplits = EstTraj$TimeSplits
+  n_regions = length(TimeSplits) - 1
+  n_models = nrow(EstTraj$Traj[[1]])
+  t_seq = seq(min(TimeSplits), max(TimeSplits), by = t_grid_size)
+
+  # Same region rule as the other evaluation functions
+  idx = pmin(pmax(findInterval(t_seq, TimeSplits, left.open = TRUE), 1), n_regions)
+  s = t_seq - TimeSplits[idx]
+  B = cbind(s^3, s^2, s, 1)
+  variance = matrix(0, length(t_seq), n_models)
+
+  for(r in unique(idx)){
+    sel = idx == r
+    Bs = B[sel, , drop = FALSE]
+    for(m in seq_len(n_models)){
+      block = EstTraj$Cov[[r]][1:4 + (m - 1)*4, 1:4 + (m - 1)*4]
+      variance[sel, m] = rowSums((Bs %*% block) * Bs) + P_Int*EstTraj$Sigma2[[r]]
+    }
+  }
+
+  z = stats::qnorm((1 + CL)/2)
+  width = colMeans(2*z*sqrt(pmax(variance, 0)))
+  names(width) = stringr::str_c("Trajectory", seq_len(n_models))
+  width
+
+}
+
+
+# Shared argument checks for the interval-width functions.
+checkIntervalArgs = function(CL, t_grid_size){
+
+  if(length(CL) != 1 || !is.numeric(CL) || CL <= 0 || CL >= 1){
+    stop("CL must be a number between 0 and 1.", call. = FALSE)
+  }
+
+  if(length(t_grid_size) != 1 || !is.numeric(t_grid_size) || t_grid_size <= 0){
+    stop("t_grid_size must be a positive number.", call. = FALSE)
+  }
+
+  invisible(NULL)
+}

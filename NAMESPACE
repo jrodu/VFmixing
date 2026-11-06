@@ -3,6 +3,8 @@
 export(RungeKutta)
 export(TrajWeightedBaseVectorFields)
 export(animatePathTraj)
+export(avgCIWidthPath)
+export(avgCIWidthTraj)
 export(avgMagError)
 export(baseVectorFields)
 export(constructIntegralList_PathTraj)
