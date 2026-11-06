@@ -68,15 +68,28 @@ getLikelihoodTraj = function(EstTraj){
 #' @param EstPath an EstimatedPath object. This is the path all the trajectories where estimated from.
 #' @param show a boolean. TRUE if the criterion values should be displayed.
 #' @param type a string. The model criterion. 
-#' Must pick from the following: AIC, BIC, or BICOpt. 
-#' BIC and AIC can be used with the ByFours trajectory method. BICOpt musr be used with Optimization.
+#' Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.
+#' BIC and AIC can be used with the ByFours trajectory method. BICOS must be used with OneShot.
+#' The old name "BICOpt" is accepted as an alias for "BICOS".
 #' @param V_Smooth a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.
 #'
 #' @returns an EstimatedTraj object.
 #' @export
 #'
 getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smooth = T){
-  
+
+  if(identical(type, "BICOpt")){
+    type = "BICOS"
+  }
+
+  valid_types = c("BIC", "BICOS", "BICPos", "AIC", "VarPos")
+
+  if(length(type) != 1 || !(type %in% valid_types)){
+    stop("type must be one of: ", paste(valid_types, collapse = ", "), call. = FALSE)
+  }
+
+  n_dim = nrow(EstPath$Path[[1]])
+
   if(type == "BIC"){
     
     getBIC = function(cur_traj){
@@ -130,6 +143,7 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getBICPos = function(cur_traj){
       
       t_seq = cur_traj$Error[,1]
+      n_points = length(t_seq)
       EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_models = nrow(cur_traj$Traj[[1]])
       n_param = n_models*(4 + V_Smooth*(length(cur_traj)-1) + (!V_Smooth)*2*(length(cur_traj)-1))

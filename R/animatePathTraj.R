@@ -16,9 +16,9 @@
 #' 
 #' @examples
 #' animation <- animatePathTraj(PathList = ExEstPath_Projection$Path, 
-#'                        TrajList = ExEstTraj_Optimization$Traj, 
+#'                        TrajList = ExEstTraj_OneShot$Traj, 
 #'                        PathTimeSplits = ExEstPath_Projection$TimeSplits, 
-#'                        TrajTimeSplits = ExEstTraj_Optimization$TimeSplits,
+#'                        TrajTimeSplits = ExEstTraj_OneShot$TimeSplits,
 #'                        baseVectorFields = baseVectorFields, n_points = 500)
 #' #gganimate::animate(animation)
 #'   

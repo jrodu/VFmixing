@@ -11,7 +11,7 @@
 #'
 #' @examples
 #' getPropagationList(Path = ExEstPath_ByFours, 
-#'              TrajList = list(ExEstTraj_ByFours, ExEstTraj_Optimization), 
+#'              TrajList = list(ExEstTraj_ByFours, ExEstTraj_OneShot), 
 #'              baseVectorFields = baseVectorFields, 
 #'             prop_t_grid_size = 0.1, n_prop_steps = 10)
 #' 

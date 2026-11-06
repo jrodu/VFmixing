@@ -22,9 +22,9 @@ a numeric scalar.
 Another cubic percent error-like metric.
 }
 \examples{
-cubicAltPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+cubicAltPercentError(EstCubic = ExEstTraj_OneShot$Traj, 
                      TrueCubic = ExTraj$Traj, 
-                     EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+                     EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
                      TrueTimeSplits = ExTraj$TimeSplits)
 
 }

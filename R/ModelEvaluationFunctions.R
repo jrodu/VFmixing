@@ -13,9 +13,9 @@
 #' @export
 #' 
 #' @examples
-#' cubicPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+#' cubicPercentError(EstCubic = ExEstTraj_OneShot$Traj, 
 #'                   TrueCubic = ExEstTraj_ByFours$Traj, 
-#'                   EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                   EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
 #'                   TrueTimeSplits = ExEstTraj_ByFours$TimeSplits)
 #'   
 cubicPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits){
@@ -68,9 +68,9 @@ cubicPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits)
 #' @export
 #' 
 #' @examples
-#' cubicAltPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+#' cubicAltPercentError(EstCubic = ExEstTraj_OneShot$Traj, 
 #'                      TrueCubic = ExTraj$Traj, 
-#'                      EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                      EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
 #'                      TrueTimeSplits = ExTraj$TimeSplits)
 #' 
 cubicAltPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits){
@@ -133,9 +133,9 @@ cubicAltPercentError = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSpli
 #' @export
 #' 
 #' @examples
-#' cubicAvgSquareDist(EstCubic = ExEstTraj_Optimization$Traj, 
+#' cubicAvgSquareDist(EstCubic = ExEstTraj_OneShot$Traj, 
 #'                    TrueCubic = ExTraj$Traj, 
-#'                    EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+#'                    EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
 #'                    TrueTimeSplits = ExTraj$TimeSplits)
 #'   
 cubicAvgSquareDist = function(EstCubic, TrueCubic, EstTimeSplits, TrueTimeSplits, lower_bound, upper_bound){
@@ -227,7 +227,7 @@ coverageRatePath = function(EstPath, Data, CL = 0.95){
 
 #' coverageRateTraj
 #'
-#' @param EstTraj an EstimatedTrajectory object. Must have been estimated using the Optimzation method.
+#' @param EstTraj an EstimatedTrajectory object. Must have been estimated using the OneShot method.
 #' @param TrueTraj a list of numeric matrices. The list of coefficient matrices of a true trajectory.
 #' @param TrueTrajTimeSplits a numeric vector. The nodes of the true trajectory in addition with the starting and ending time.
 #' @param CL a real number between 0 and 1. The confidence level of the intervals to check the coverage rate.
@@ -236,7 +236,7 @@ coverageRatePath = function(EstPath, Data, CL = 0.95){
 #' @export
 #' 
 #' @examples
-#' coverageRateTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+#' coverageRateTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj, 
 #'                  TrueTrajTimeSplits = ExTraj$TimeSplits, CL = 0.95)
 #'   
 #'
@@ -301,7 +301,7 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
 #' @export
 #' 
 #' @examples
-#' avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_Optimization, 
+#' avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_OneShot, 
 #'             Path = ExEstPath_Projection, upper = 5, lower = 0)
 #'   
 avgMagError = function(baseVectorFields, Traj, Path, upper, lower){

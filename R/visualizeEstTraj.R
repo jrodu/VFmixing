@@ -6,16 +6,16 @@
 #' @param EstPath an EstimatedPath object. The path used to estimate the trajectories.
 #' @param baseVectorFields a baseVectorFieldFunction.
 #' @param t_grid_size a positive numeric scalar. The time grid size of the plotting.
-#' @param CL a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the Optimization method.
+#' @param CL a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the OneShot method.
 #' @param P_Int a boolean. TRUE if the prediction interval should be plotted. FALSE if the confidence interval on the mean should be plotted.
-#' Only used if EstTraj was estimated using the Optimization method.
+#' Only used if EstTraj was estimated using the OneShot method.
 #' @param Cos_Cutoff a real number between 0 and 1. The cosine value to determine the cutoff for when vector fields are too colinear. 
 #'
 #' @returns a ggplot2 object.
 #' @export
 #' 
 #' @examples
-#' # visualizeEstTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+#' # visualizeEstTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj, 
 #' #                  TrueTrajTimeSplits = ExTraj$TimeSplits, 
 #' #                  EstPath = ExEstPath_Projection, 
 #' #                  baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
