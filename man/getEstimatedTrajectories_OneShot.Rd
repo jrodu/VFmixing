@@ -10,7 +10,9 @@ getEstimatedTrajectories_OneShot(
   baseVectorFields,
   V_Smooth = F,
   Model_Selection_Type = "BIC",
-  Random_Path = F
+  Random_Path = F,
+  quad_nodes = 20,
+  patience = NULL
 )
 }
 \arguments{
@@ -28,19 +30,47 @@ Must pick from the following: BIC, BICOS, AIC, VarPos. See \code{\link[=getBestS
 
 \item{Random_Path}{a boolean. TRUE if the path used to estimate the trajectories should be randomly generated.
 If TRUE, the path must've been estimated using the FullRegression, Projection or FullFours method.}
+
+\item{quad_nodes}{a positive integer. The number of Gauss-Legendre nodes per piece of each region. See Details.}
+
+\item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
+Otherwise, stop after this many consecutive candidates without improving the criterion. See Details.}
 }
 \value{
 an EstimatedTrajectory object.
 }
 \description{
-getEstimatedTrajectories_OneShot
+Estimates the trajectory (weight) functions by transforming the path
+coefficients into trajectory coefficients, which gives a covariance
+structure for the trajectories.
+}
+\details{
+The integrals this method needs are computed with Gauss-Legendre quadrature:
+each trajectory region is split at the path nodes, and the path and
+\code{baseVectorFields} are evaluated at \code{quad_nodes} points on each piece. Every
+integral is then formed from those values, and a region's values are reused
+for every later candidate. With smooth vector fields the default of 20 nodes
+is accurate to around machine precision. Increase \code{quad_nodes} if
+\code{baseVectorFields} changes abruptly along the path.
+
+Candidates are produced by repeatedly splitting a region, up to \code{nsplits}
+splits. By default every candidate is fit and the best is chosen with
+\code{Model_Selection_Type}. Setting \code{patience} stops the search once that many
+candidates in a row have failed to improve on the best criterion so far.
+This is much faster when the best model has few regions, but it can miss a
+better model that would only appear after a long run without improvement.
 }
 \examples{
 \donttest{
 ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
-     EstPath = ExEstPath_FullFours, 
-     nsplits = 100, baseVectorFields = baseVectorFields, 
+     EstPath = ExEstPath_FullFours,
+     nsplits = 100, baseVectorFields = baseVectorFields,
      V_Smooth = FALSE, Model_Selection_Type = "BIC", Random_Path = FALSE)
 }
-    
+
+# Stop once 10 candidates in a row fail to improve the BIC
+EstTraj = getEstimatedTrajectories_OneShot(
+     EstPath = ExEstPath_FullFours,
+     nsplits = 100, baseVectorFields = baseVectorFields, patience = 10)
+
 }

@@ -80,6 +80,24 @@ getLikelihoodTraj = function(EstTraj){
 #'
 getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smooth = T){
 
+  type = checkTrajSelectionType(type)
+  
+  criterion = trajSelectionCriterion(EstTrajList, EstPath, type, V_Smooth)
+  
+  best_index = which.min(criterion)
+  
+  reportBestRegions(length(EstTrajList[[best_index]]$Traj))
+  if(show){
+    print(criterion)
+  }
+  
+  EstTrajList[[best_index]]
+  
+}
+
+# Validate a trajectory model-selection type and resolve aliases.
+checkTrajSelectionType = function(type){
+
   if(identical(type, "BICOpt")){
     type = "BICOS"
   }
@@ -94,6 +112,12 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
   if(length(type) != 1 || !(type %in% valid_types)){
     stop("type must be one of: ", paste(valid_types, collapse = ", "), call. = FALSE)
   }
+  
+  type
+}
+
+# The model-selection criterion (smaller is better) for each candidate trajectory.
+trajSelectionCriterion = function(EstTrajList, EstPath, type, V_Smooth){
   
   if(type == "VarPos" && is.null(EstTrajList[[1]]$Cov)){
     stop("type = \"VarPos\" needs a trajectory with a covariance structure (OneShot). ",
@@ -161,13 +185,6 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     
   }
   
-  best_index = which.min(criterion)
-  
-  reportBestRegions(length(EstTrajList[[best_index]]$Traj))
-  if(show){
-    print(criterion)
-  }
-  
-  EstTrajList[[best_index]]
+  criterion
   
 }
