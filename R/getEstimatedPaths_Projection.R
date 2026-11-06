@@ -137,17 +137,25 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
 #' @param V_Smooth a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.
 #' @param Model_Selection_Type a string. The model criterion. 
-#' Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel. 
+#' Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.
+#' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
+#' Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
+#' This is faster, but it can miss a better model that only appears after a long run without improvement.
 #'
 #' @returns an EstimatedPath object.
 #' @export
-#' 
+#'
 #' @examples
 #' \donttest{
 #' getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC")
 #' }
-#' 
-getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC"){
+#'
+getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC", patience = NULL){
+
+  checkPathSelectionType(Model_Selection_Type)
+  checkPatience(patience)
+  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth)
+
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
   Data = data.frame(Data)
@@ -159,7 +167,11 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
   all_splits_est_path = list()
   
   all_splits_est_path[[1]] = runEstPathStep_Projection(Data = Data, time_splits = time_splits, cur_unrestricted_coefs = list(), cur_unrestricted_cov = list(list()), cur_integral_list = list(), cur_sigma2_list = list(), worst_split = 1, V_Smooth = V_Smooth)
-  
+
+  if(!is.null(patience)){
+    tracker$add(all_splits_est_path[[1]])
+  }
+
   svMisc::progress(1, max.value = nsplits, progress.bar = T, console = T)
   
   if(sum(all_splits_est_path[[1]]$PosSplits) == 0){
@@ -175,14 +187,23 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
       all_splits_est_path[[length(all_splits_est_path)+1]] = runEstPathStep_Projection(Data = Data, time_splits = time_splits, cur_unrestricted_coefs = all_splits_est_path[[length(all_splits_est_path)]]$UnrestrictedCoef, cur_unrestricted_cov = all_splits_est_path[[length(all_splits_est_path)]]$UnrestrictedCov, cur_integral_list = all_splits_est_path[[length(all_splits_est_path)]]$IntegralList, cur_sigma2_list = all_splits_est_path[[length(all_splits_est_path)]]$Sigma2, worst_split = worst_split, V_Smooth = V_Smooth)
       
       svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
-      
+
+      if(!is.null(patience) && tracker$add(all_splits_est_path[[length(all_splits_est_path)]])){
+        break
+      }
+
       if(sum(all_splits_est_path[[length(all_splits_est_path)]]$PosSplits) == 0){
         break
       }
-      
+
     }
   }
-  
+
+  if(!is.null(patience)){
+    # The candidates were already scored while searching.
+    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type))
+  }
+
   getBestSplitsPath(EstPath = all_splits_est_path, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
 }
 

@@ -8,7 +8,8 @@ getEstimatedPaths_FullFours(
   Data,
   nsplits,
   V_Smooth = F,
-  Model_Selection_Type = "BIC"
+  Model_Selection_Type = "BIC",
+  patience = NULL
 )
 }
 \arguments{
@@ -21,6 +22,10 @@ The ByFours node search always uses C1 smoothness.}
 
 \item{Model_Selection_Type}{a string. The model criterion.
 Must pick from the following: BIC, AIC, BICVel, VarPos, VarVel, VarPosVel. See Details.}
+
+\item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is considered.
+Otherwise, stop after this many consecutive candidates that do not improve the selection criterion. See Details.
+This is faster, but it can miss a better model that only appears after a long run without improvement.}
 }
 \value{
 an EstimatedPath object, with the same elements as one from
@@ -50,6 +55,11 @@ ByFours candidate and the criterion is applied to those fits. This is
 slower (one full regression per candidate) but still avoids the
 FullRegression node search.
 }
+
+\code{patience} stops the search once that many candidates in a row have failed
+to improve the criterion. With \code{"BIC"} or \code{"AIC"} it stops the ByFours node
+search; with the covariance-based criteria the (cheap) node search always
+runs in full and \code{patience} stops the full regressions on its candidates.
 }
 \examples{
 ExEstPath_FullFours <- getEstimatedPaths_FullFours(ExData, nsplits = 100)

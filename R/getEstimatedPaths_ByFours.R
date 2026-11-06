@@ -10,19 +10,27 @@
 #' The other criteria need a covariance structure, which ByFours does not produce.
 #' @param return_all a boolean. If TRUE, return the list of every candidate path from the node search instead of the selected one. 
 #' Used by [getEstimatedPaths_FullFours()].
+#' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
+#' Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
+#' This is faster, but it can miss a better model that only appears after a long run without improvement.
 #'
-#' @returns an EstimatedPath object. 
+#' @returns an EstimatedPath object.
 #' @export
-#' 
+#'
 #' @examples
 #' getEstimatedPaths_ByFours(ExData, 100)
-#' 
-getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC", return_all = F){
-  
+#'
+getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC", return_all = F, patience = NULL){
+
   if(!(Model_Selection_Type %in% c("BIC", "AIC"))){
     stop("Model_Selection_Type must be \"BIC\" or \"AIC\" for the ByFours method.", call. = FALSE)
   }
-  
+
+  checkPatience(patience)
+
+  # ByFours candidates are always C1.
+  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth = F)
+
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
@@ -96,7 +104,11 @@ getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC"
   Error_mat = cbind(t = cur_Data$t,(cur_Data[,-1] - est_pos)^2)
   
   all_splits_est_path[[1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = 4, PosSplits = pos_splits)
-  
+
+  if(!is.null(patience)){
+    tracker$add(all_splits_est_path[[1]])
+  }
+
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
   while(length(time_splits)-1 <= nsplits){
@@ -460,17 +472,26 @@ getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC"
     all_splits_est_path[[length(all_splits_est_path)+1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = length(est_path), PosSplits = pos_splits)
     
     svMisc::progress(length(est_path) - 1, max.value = nsplits, progress.bar = T, console = T)
-    
+
+    if(!is.null(patience) && tracker$add(all_splits_est_path[[length(all_splits_est_path)]])){
+      break
+    }
+
     if(sum(pos_splits) == 0){
       break
     }
-    
+
   }
-  
+
   if(return_all){
     return(all_splits_est_path)
   }
-  
+
+  if(!is.null(patience)){
+    # The candidates were already scored while searching.
+    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type))
+  }
+
   getBestSplitsPath(all_splits_est_path, show = F, V_Smooth = F, type = Model_Selection_Type)
-  
+
 }
