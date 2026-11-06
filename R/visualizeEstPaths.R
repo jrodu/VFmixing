@@ -15,11 +15,11 @@
 #' How the uncertainty is drawn depends on the axes:
 #' * If one axis is time (`"t"`), the interval for the other variable is drawn
 #'   as a shaded band.
-#' * If both axes are positions, an ellipse is drawn at `n_ellipses` evenly
-#'   spaced times. The dimensions are estimated separately, so the ellipses are
-#'   axis-aligned. They are joint regions for the two coordinates at level `CL`
-#'   (radius \eqn{\sqrt{\chi^2_{2, CL}}} standard deviations), so they are wider
-#'   than the per-dimension intervals.
+#' * If both axes are positions, the joint region for the two coordinates is
+#'   drawn at every plotted time, which together form a shaded tube around the
+#'   path. Each region is an axis-aligned ellipse (the dimensions are estimated
+#'   separately) with radius \eqn{\sqrt{\chi^2_{2, CL}}} standard deviations,
+#'   so the tube is wider than the per-dimension intervals.
 #'
 #' Paths without a covariance structure (ByFours) are drawn without intervals.
 #'
@@ -31,19 +31,18 @@
 #' @param CL a real number between 0 and 1. The confidence level of the intervals.
 #' @param P_Int a boolean. TRUE for prediction intervals (path uncertainty plus observation noise),
 #' FALSE for confidence intervals on the path.
-#' @param n_ellipses a positive integer. The number of ellipses drawn when both axes are positions.
 #'
 #' @returns a ggplot2 object.
 #' @export
 #'
 #' @examples
-#' # Position plot with 95% prediction ellipses
+#' # Position plot with the 95% joint prediction region
 #' visualizeEstPath(ExData, ExEstPath_FullFours, x_var = 'X1', y_var = 'X2')
 #'
 #' # One dimension over time with a 95% confidence band for the path
 #' visualizeEstPath(ExData, ExEstPath_FullFours, x_var = 't', y_var = 'X1', P_Int = FALSE)
 #'
-visualizeEstPath = function(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1", CL = 0.95, P_Int = T, n_ellipses = 20){
+visualizeEstPath = function(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1", CL = 0.95, P_Int = T){
 
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
@@ -88,11 +87,12 @@ visualizeEstPath = function(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_va
   x_sym = dplyr::sym(x_var)
   y_sym = dplyr::sym(y_var)
 
-  plot = ggplot2::ggplot() +
-    ggplot2::geom_point(data = Data, ggplot2::aes(x = !!x_sym, y = !!y_sym), alpha = 0.15)
-
   interval_label = stringr::str_c(round(100*CL), "% ", if(P_Int) "prediction" else "confidence")
+  interval_fill = "#F4B6B6"
+  
+  plot = ggplot2::ggplot()
 
+  # The interval goes underneath the data and the path.
   if(has_cov){
 
     if(x_var == "t" || y_var == "t"){
@@ -104,33 +104,35 @@ visualizeEstPath = function(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_va
       Full_Path_df$upper = grid$pos[, dim_var] + z*grid$sd[, dim_var]
 
       if(x_var == "t"){
-        plot = plot + ggplot2::geom_ribbon(data = Full_Path_df, ggplot2::aes(x = t, ymin = lower, ymax = upper), fill = "red", alpha = 0.3)
+        plot = plot + ggplot2::geom_ribbon(data = Full_Path_df, ggplot2::aes(x = t, ymin = lower, ymax = upper), fill = interval_fill)
       } else{
-        plot = plot + ggplot2::geom_ribbon(data = Full_Path_df, ggplot2::aes(y = t, xmin = lower, xmax = upper), fill = "red", alpha = 0.3, orientation = "y")
+        plot = plot + ggplot2::geom_ribbon(data = Full_Path_df, ggplot2::aes(y = t, xmin = lower, xmax = upper), fill = interval_fill, orientation = "y")
       }
 
       plot = plot + ggplot2::labs(caption = stringr::str_c("Shaded: ", interval_label, " interval"))
 
     } else{
 
-      # Axis-aligned joint ellipses at evenly spaced times
-      t_ell = seq(min(TimeSplits), max(TimeSplits), length.out = n_ellipses)
-      ell = pathWithSD(t_ell)
+      # Swept region: the union of the joint regions at every plotted time.
+      # The dimensions are estimated separately, so each region is an
+      # axis-aligned ellipse; drawn solid, their union is a smooth tube.
       radius = sqrt(stats::qchisq(CL, df = 2))
-      angle = seq(0, 2*pi, length.out = 61)
+      angle = seq(0, 2*pi, length.out = 41)
+      n_t = length(t_seq)
 
-      Ellipse_df = do.call(rbind, lapply(seq_along(t_ell), function(i){
-        data.frame(id = i,
-                   x = ell$pos[i, x_var] + radius*ell$sd[i, x_var]*cos(angle),
-                   y = ell$pos[i, y_var] + radius*ell$sd[i, y_var]*sin(angle))
-      }))
+      Region_df = data.frame(id = rep(seq_len(n_t), each = length(angle)),
+                             x = rep(grid$pos[, x_var], each = length(angle)) + rep(radius*grid$sd[, x_var], each = length(angle))*cos(angle),
+                             y = rep(grid$pos[, y_var], each = length(angle)) + rep(radius*grid$sd[, y_var], each = length(angle))*sin(angle))
 
-      plot = plot + ggplot2::geom_polygon(data = Ellipse_df, ggplot2::aes(x = x, y = y, group = id), fill = "red", alpha = 0.15, colour = "red", linewidth = 0.3) +
-        ggplot2::labs(caption = stringr::str_c("Ellipses: joint ", interval_label, " regions"))
+      plot = plot + ggplot2::geom_polygon(data = Region_df, ggplot2::aes(x = x, y = y, group = id), fill = interval_fill, colour = NA) +
+        ggplot2::labs(caption = stringr::str_c("Shaded: joint ", interval_label, " region"))
 
     }
   }
 
-  plot + ggplot2::geom_path(data = Full_Path_df, ggplot2::aes(x = !!x_sym, y = !!y_sym))
+  plot +
+    ggplot2::geom_point(data = Data, ggplot2::aes(x = !!x_sym, y = !!y_sym), alpha = 0.25) +
+    ggplot2::geom_path(data = Full_Path_df, ggplot2::aes(x = !!x_sym, y = !!y_sym)) +
+    ggplot2::labs(x = x_var, y = y_var)
 
 }

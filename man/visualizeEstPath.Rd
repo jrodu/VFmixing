@@ -11,8 +11,7 @@ visualizeEstPath(
   x_var = "t",
   y_var = "X1",
   CL = 0.95,
-  P_Int = T,
-  n_ellipses = 20
+  P_Int = T
 )
 }
 \arguments{
@@ -30,8 +29,6 @@ visualizeEstPath(
 
 \item{P_Int}{a boolean. TRUE for prediction intervals (path uncertainty plus observation noise),
 FALSE for confidence intervals on the path.}
-
-\item{n_ellipses}{a positive integer. The number of ellipses drawn when both axes are positions.}
 }
 \value{
 a ggplot2 object.
@@ -52,17 +49,17 @@ How the uncertainty is drawn depends on the axes:
 \itemize{
 \item If one axis is time (\code{"t"}), the interval for the other variable is drawn
 as a shaded band.
-\item If both axes are positions, an ellipse is drawn at \code{n_ellipses} evenly
-spaced times. The dimensions are estimated separately, so the ellipses are
-axis-aligned. They are joint regions for the two coordinates at level \code{CL}
-(radius \eqn{\sqrt{\chi^2_{2, CL}}} standard deviations), so they are wider
-than the per-dimension intervals.
+\item If both axes are positions, the joint region for the two coordinates is
+drawn at every plotted time, which together form a shaded tube around the
+path. Each region is an axis-aligned ellipse (the dimensions are estimated
+separately) with radius \eqn{\sqrt{\chi^2_{2, CL}}} standard deviations,
+so the tube is wider than the per-dimension intervals.
 }
 
 Paths without a covariance structure (ByFours) are drawn without intervals.
 }
 \examples{
-# Position plot with 95\% prediction ellipses
+# Position plot with the 95\% joint prediction region
 visualizeEstPath(ExData, ExEstPath_FullFours, x_var = 'X1', y_var = 'X2')
 
 # One dimension over time with a 95\% confidence band for the path

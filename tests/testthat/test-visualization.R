@@ -22,20 +22,24 @@ test_that("visualizeEstPath draws prediction and confidence bands over time", {
   ci_plot = visualizeEstPath(ExData, ExEstPath_FullFours, x_var = "t", y_var = "X1", P_Int = FALSE)
   expect_s3_class(pi_plot, "ggplot")
 
-  band = function(p){ d = ggplot2::layer_data(p, 2); mean(d$ymax - d$ymin) }
+  # The interval is the first layer, so it sits under the data
+  band = function(p){ d = ggplot2::layer_data(p, 1); mean(d$ymax - d$ymin) }
   expect_gt(band(ci_plot), 0)
   expect_gt(band(pi_plot), band(ci_plot))   # the prediction band adds the observation noise
 
   # The plotted 95% prediction band contains the same share of data as coverageRatePath()
-  d = ggplot2::layer_data(pi_plot, 2)
+  d = ggplot2::layer_data(pi_plot, 1)
   inside = mean(ExData$X1 >= stats::approx(d$x, d$ymin, ExData$t)$y & ExData$X1 <= stats::approx(d$x, d$ymax, ExData$t)$y)
   expect_equal(inside, coverageRatePath(ExEstPath_FullFours, ExData)[1], tolerance = 0.01)
 })
 
-test_that("visualizeEstPath draws ellipses for position plots", {
-  p = visualizeEstPath(ExData, ExEstPath_FullFours, x_var = "X1", y_var = "X2", n_ellipses = 7)
-  ell = ggplot2::layer_data(p, 2)
-  expect_equal(length(unique(ell$group)), 7)
+test_that("visualizeEstPath draws a swept joint region for position plots", {
+  p = visualizeEstPath(ExData, ExEstPath_FullFours, t_grid_size = 0.1, x_var = "X1", y_var = "X2")
+  region = ggplot2::layer_data(p, 1)
+  # one joint region per plotted time
+  expect_equal(length(unique(region$group)), length(seq(0, 5, by = 0.1)))
+  expect_length(p$layers, 3)
+  expect_equal(c(p$labels$x, p$labels$y), c("X1", "X2"))
 })
 
 test_that("visualizeEstPath plots paths without a covariance and checks its inputs", {

@@ -99,7 +99,8 @@ Because the "FullFours" path has a covariance structure, the plot can show its
 uncertainty. By default these are 95% prediction intervals for a new
 observation: the uncertainty in the fitted path plus the observation noise
 (`P_Int = FALSE` shows a confidence interval for the path itself instead). When
-both axes are positions, they are drawn as ellipses at evenly spaced times:
+both axes are positions, the shaded tube is the joint 95% region for both
+coordinates, swept along the path:
 
 ```{r}
 visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,

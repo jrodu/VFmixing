@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x00000225f3717ce8>
+#> <bytecode: 0x000001b589766508>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -98,15 +98,15 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.25    0.04    0.29
+#>    0.18    0.08    0.32
 ```
 
 Because the “FullFours” path has a covariance structure, the plot can
 show its uncertainty. By default these are 95% prediction intervals for
 a new observation: the uncertainty in the fitted path plus the
 observation noise (`P_Int = FALSE` shows a confidence interval for the
-path itself instead). When both axes are positions, they are drawn as
-ellipses at evenly spaced times:
+path itself instead). When both axes are positions, the shaded tube is
+the joint 95% region for both coordinates, swept along the path:
 
 ``` r
 visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
@@ -186,7 +186,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>   11.20    0.29   11.71
+#>   11.74    0.11   12.17
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -207,7 +207,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.04    0.00    0.06
+#>    0.08    0.00    0.08
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
