@@ -24,7 +24,7 @@ a numeric scalar.
 Finds the average magnitude of the error velocity vectors.
 }
 \examples{
-avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_Optimization, 
+avgMagError(baseVectorFields = baseVectorFields, Traj = ExEstTraj_OneShot, 
             Path = ExEstPath_Projection, upper = 5, lower = 0)
   
 }

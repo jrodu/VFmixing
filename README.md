@@ -117,7 +117,7 @@ we used the “Projection” methods for the path, we showcase the
 #                                                  nsplits = 100,
 #                                      baseVectorFields = baseVectorFields,
 #                                      V_Smooth = F,
-#                                      Model_Selection_Type = "BICOpt",
+#                                      Model_Selection_Type = "BICOS",
 #                                      Random_Path = F)
 
 EstTraj <- VFmixing::ExEstTraj_OneShot

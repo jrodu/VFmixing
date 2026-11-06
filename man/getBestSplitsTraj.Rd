@@ -15,8 +15,9 @@ They should all be related using the same path with an increasing number of spli
 \item{show}{a boolean. TRUE if the criterion values should be displayed.}
 
 \item{type}{a string. The model criterion.
-Must pick from the following: AIC, BIC, or BICOpt.
-BIC and AIC can be used with the ByFours trajectory method. BICOpt musr be used with Optimization.}
+Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.
+BIC and AIC can be used with the ByFours trajectory method. BICOS must be used with OneShot.
+The old name "BICOpt" is accepted as an alias for "BICOS".}
 
 \item{V_Smooth}{a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.}
 }

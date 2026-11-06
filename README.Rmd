@@ -115,7 +115,7 @@ showcase the "One-Shot" method for the trajectories.
 #                                                  nsplits = 100,
 #                                      baseVectorFields = baseVectorFields,
 #                                      V_Smooth = F,
-#                                      Model_Selection_Type = "BICOpt",
+#                                      Model_Selection_Type = "BICOS",
 #                                      Random_Path = F)
 
 EstTraj <- VFmixing::ExEstTraj_OneShot

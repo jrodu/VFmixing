@@ -7,7 +7,7 @@
 coverageRateTraj(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95)
 }
 \arguments{
-\item{EstTraj}{an EstimatedTrajectory object. Must have been estimated using the Optimzation method.}
+\item{EstTraj}{an EstimatedTrajectory object. Must have been estimated using the OneShot method.}
 
 \item{TrueTraj}{a list of numeric matrices. The list of coefficient matrices of a true trajectory.}
 
@@ -22,7 +22,7 @@ a numeric vector. Each entry corresponds to the coverage rate for a given model
 coverageRateTraj
 }
 \examples{
-coverageRateTraj(EstTraj = ExEstTraj_Optimization, TrueTraj = ExTraj$Traj, 
+coverageRateTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj, 
                  TrueTrajTimeSplits = ExTraj$TimeSplits, CL = 0.95)
   
 

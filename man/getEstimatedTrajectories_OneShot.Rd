@@ -9,7 +9,7 @@ getEstimatedTrajectories_OneShot(
   nsplits,
   baseVectorFields,
   V_Smooth = F,
-  Model_Selection_Type = "BICOpt",
+  Model_Selection_Type = "BICOS",
   Random_Path = F
 )
 }
@@ -23,7 +23,7 @@ getEstimatedTrajectories_OneShot(
 \item{V_Smooth}{a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.}
 
 \item{Model_Selection_Type}{a string. The model criterion.
-Must pick from the following: BIC, BICOpt, BICPos, AIC, VarPos.}
+Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.}
 
 \item{Random_Path}{a boolean. TRUE if the path used to estimate the trajectories should be randomly generated.
 If TRUE, the path must've been estimated using the FullRegression or Projection method.}
@@ -38,6 +38,6 @@ getEstimatedTrajectories_OneShot
 ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
      EstPath = ExEstPath_Projection, 
      nsplits = 100, baseVectorFields = baseVectorFields, 
-     V_Smooth = FALSE, Model_Selection_Type = "BICOpt", Random_Path = FALSE)
+     V_Smooth = FALSE, Model_Selection_Type = "BICOS", Random_Path = FALSE)
     
 }

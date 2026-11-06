@@ -33,9 +33,9 @@ a numeric scalar.
 Finds the average squared distance between 2 cubic spline functions.
 }
 \examples{
-cubicAvgSquareDist(EstCubic = ExEstTraj_Optimization$Traj, 
+cubicAvgSquareDist(EstCubic = ExEstTraj_OneShot$Traj, 
                    TrueCubic = ExTraj$Traj, 
-                   EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+                   EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
                    TrueTimeSplits = ExTraj$TimeSplits)
   
 }

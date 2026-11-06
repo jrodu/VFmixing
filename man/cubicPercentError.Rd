@@ -22,9 +22,9 @@ a numeric vector. The first is the percent error and the second is the error ass
 Get the percent error between 2 cubic spline functions.
 }
 \examples{
-cubicPercentError(EstCubic = ExEstTraj_Optimization$Traj, 
+cubicPercentError(EstCubic = ExEstTraj_OneShot$Traj, 
                   TrueCubic = ExEstTraj_ByFours$Traj, 
-                  EstTimeSplits = ExEstTraj_Optimization$TimeSplits, 
+                  EstTimeSplits = ExEstTraj_OneShot$TimeSplits, 
                   TrueTimeSplits = ExEstTraj_ByFours$TimeSplits)
   
 }
