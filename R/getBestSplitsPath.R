@@ -5,20 +5,32 @@
 #' @param V_Smooth a boolean. TRUE if the path cubic spline had C2 smoothness. FALSE if C1.
 #' @param type a string. The model criterion. 
 #' Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel. 
-#' BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel can only be used with FullRegression and Projection.
+#' BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel need a covariance structure,
+#' so they can only be used with FullRegression, Projection and FullFours.
 #'
 #' @returns an EstimatedPath object.
 #' @export
 #'
-getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
-  
+getBestSplitsPath = function(EstPath, show = F, V_Smooth = T, type = "BIC"){
+
+  valid_types = c("BIC", "BICVel", "AIC", "VarPos", "VarVel", "VarPosVel")
+
+  if(length(type) != 1 || !(type %in% valid_types)){
+    stop("type must be one of: ", paste(valid_types, collapse = ", "), call. = FALSE)
+  }
+
+  if(type %in% c("BICVel", "VarPos", "VarVel", "VarPosVel") && is.null(EstPath[[1]]$Cov)){
+    stop("type = \"", type, "\" needs a path with a covariance structure ",
+         "(FullRegression, Projection or FullFours). Use \"BIC\" or \"AIC\" instead.", call. = FALSE)
+  }
+
   if(type == "BIC"){
     
     getBIC = function(cur_path){
       
       n_dim = nrow(cur_path$Path[[1]])
       n_points = nrow(cur_path$Error)*(ncol(cur_path$Error)-1)
-      n_param = n_dim*(4 + V_Smooth*(length(cur_path$Path)-1) + (!V_Smooth)*2*(length(cur_path$Path)-1))
+      n_param = n_dim*splineFreeParams(length(cur_path$Path), V_Smooth)
       
       return((n_param)*log(n_points) + n_points*log(stats::median(rowSums(cur_path$Error[,-1]))))
       
@@ -27,9 +39,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     BIC = sapply(EstPath, getBIC)
     
     best_index = which.min(BIC)
-    n_splits = EstPath[[best_index]]$n_splits
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(BIC)
     }
@@ -47,8 +59,8 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
       Cov = cur_path$Cov
       Sigma2 = cur_path$Sigma2
       Error = cur_path$Error
-      n_param = n_dim*(4 + V_Smooth*(length(cur_path)-1) + (!V_Smooth)*2*(length(cur_path)-1))
-      
+      n_param = n_dim*splineFreeParams(length(cur_path$Path), V_Smooth)
+
       evaluateIndividualPath = function(t){
         cur_path_index = min(c(max(c(sum((TimeSplits - t)<0),1)), length(TimeSplits)-1))
         cur_difft = t - TimeSplits[cur_path_index]
@@ -68,12 +80,18 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     
     BIC_Vel = sapply(EstPath, getBICVel)
     
-    vel_cutoff = which(diff(log(BIC_Vel[,2]))>1)[1]
+    # Only consider models before the velocity variance first jumps by more
+    # than a factor of e. If it never jumps, consider every model.
+    vel_cutoff = which(diff(log(BIC_Vel[2,])) > 1)[1]
+
+    if(is.na(vel_cutoff)){
+      vel_cutoff = ncol(BIC_Vel)
+    }
+
+    best_index = which.min(BIC_Vel[1, 1:vel_cutoff])
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    best_index = which.min(BIC_Vel[1:vel_cutoff])
-    n_splits = EstPath[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(BIC_Vel)
     }
@@ -94,9 +112,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     AIC = sapply(EstPath, getAIC)
     
     best_index = which.min(AIC)
-    n_splits = EstPath[[best_index]]$n_splits
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(AIC)
     }
@@ -130,9 +148,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_PosVar = sapply(EstPath, FUN = getMaxEstPosVar, simplify = T)
     
     best_index = which.min(max_PosVar)
-    n_splits = EstPath[[best_index]]$n_splits
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(max_PosVar)
     }
@@ -165,9 +183,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_VelVar = sapply(EstPath, FUN = getMaxEstVelVar, simplify = T)
     
     best_index = which.min(max_VelVar)
-    n_splits = EstPath[[best_index]]$n_splits
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(max_VelVar)
     }
@@ -200,9 +218,9 @@ getBestSplitsPath = function(EstPath, show, V_Smooth = T, type = "BIC"){
     max_PosVelVar = sapply(EstPath, FUN = getMaxEstPosVelVar, simplify = T)
     
     best_index = which.min(max_PosVelVar)
-    n_splits = EstPath[[best_index]]$n_splits
+    n_regions = length(EstPath[[best_index]]$Path)
     
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
+    reportBestRegions(n_regions)
     if(show){
       print(max_PosVelVar)
     }

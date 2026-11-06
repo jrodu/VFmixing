@@ -2,6 +2,7 @@
 #' 
 #' @description
 #' A function to animate a particle traveling through a trajectory-weighted vector field.
+#' Only two-dimensional paths are supported.
 #' 
 #'
 #' @param PathList a list of numeric matrices. The list of coefficient matrices of the path.
@@ -32,6 +33,10 @@ animatePathTraj = function(PathList, TrajList, PathTimeSplits, TrajTimeSplits, b
   }
   
   n_dim = nrow(PathList[[1]])
+  
+  if(n_dim != 2){
+    stop("animatePathTraj only supports two-dimensional paths; this path has ", n_dim, " dimensions.", call. = FALSE)
+  }
   n_traj = nrow(TrajList[[1]])
   t_seq = seq(min(PathTimeSplits), max(PathTimeSplits), length.out = n_points)
   
@@ -87,7 +92,7 @@ animatePathTraj = function(PathList, TrajList, PathTimeSplits, TrajTimeSplits, b
     ggplot2::geom_point(data = pos_df, ggplot2::aes(x = X1, y = X2), size = 1.5) +
     ggplot2::geom_segment(data = velocity_grid_df, ggplot2::aes(x = X1, y = X2, xend = X1 + X1v/5,
                                               yend = X2 + X2v/5), color = 'black',
-                 arrow = grid::arrow(length = grid::unit(0.1,"cm")), size = 0.5) + 
+                 arrow = grid::arrow(length = grid::unit(0.1,"cm")), linewidth = 0.5) + 
     ggplot2::theme(panel.grid.major = ggplot2::element_blank(),
           panel.grid.minor = ggplot2::element_blank(),
           panel.background = ggplot2::element_rect(fill = "aliceblue")) +

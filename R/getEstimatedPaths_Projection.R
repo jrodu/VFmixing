@@ -143,9 +143,11 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
 #' @export
 #' 
 #' @examples
-#' getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC") 
+#' \donttest{
+#' getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC")
+#' }
 #' 
-getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = T, Model_Selection_Type = "VarPosVel"){
+getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC"){
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
   Data = data.frame(Data)

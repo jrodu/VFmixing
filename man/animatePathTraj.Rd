@@ -31,6 +31,7 @@ a ggplot2 object. Can be further turned into an animation.
 }
 \description{
 A function to animate a particle traveling through a trajectory-weighted vector field.
+Only two-dimensional paths are supported.
 }
 \examples{
 animation <- animatePathTraj(PathList = ExEstPath_FullFours$Path, 

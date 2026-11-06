@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x000001f31f3919d8>
+#> <bytecode: 0x000002786e5aae78>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -143,7 +143,7 @@ In the plot above, we can see our estimate of the trajectory (solid
 line) next to the true trajectories used to construct the data (dashed
 line). We can evaluate the method’s performance more formally using the
 average squared distance between the estimated trajectories and the
-truth, as well as the coverage rate of the trajectories’ 95% intervals.
+truth, as well as the coverage rate of each trajectory’s 95% intervals.
 
 ``` r
 AvgSqDist = cubicAvgSquareDist(EstCubic = EstTraj$Traj,
@@ -159,9 +159,9 @@ TrajCovRate = coverageRateTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                                TrueTrajTimeSplits = TrueTraj$TimeSplits,
                                CL = 0.95)
 TrajCovRate
-#> [1] 1
+#> [1] 1 1
 ```
 
-The average squared distance is extremely small, and the coverage rate
-is 100%, at or above the nominal 95%. For this example the intervals
-are, if anything, conservative.
+The average squared distance is extremely small, and the coverage rates
+for the two trajectories are 100% and 100%, at or above the nominal 95%.
+For this example the intervals are, if anything, conservative.

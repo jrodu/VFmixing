@@ -4,12 +4,23 @@
 \alias{getEstimatedPaths_ByFours}
 \title{Get Estimated Path using the By Fours Method}
 \usage{
-getEstimatedPaths_ByFours(Data, nsplits)
+getEstimatedPaths_ByFours(
+  Data,
+  nsplits,
+  Model_Selection_Type = "BIC",
+  return_all = F
+)
 }
 \arguments{
 \item{Data}{a numeric n x (d+1) data frame or matrix. The first column is time with the following each dimension's position.}
 
 \item{nsplits}{a numeric scalar. The maximum number of splits the spline can split into.}
+
+\item{Model_Selection_Type}{a string. The model criterion, "BIC" or "AIC".
+The other criteria need a covariance structure, which ByFours does not produce.}
+
+\item{return_all}{a boolean. If TRUE, return the list of every candidate path from the node search instead of the selected one.
+Used by \code{\link[=getEstimatedPaths_FullFours]{getEstimatedPaths_FullFours()}}.}
 }
 \value{
 an EstimatedPath object.

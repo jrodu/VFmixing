@@ -68,9 +68,11 @@ getLikelihoodTraj = function(EstTraj){
 #' @param EstPath an EstimatedPath object. This is the path all the trajectories where estimated from.
 #' @param show a boolean. TRUE if the criterion values should be displayed.
 #' @param type a string. The model criterion. 
-#' Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.
-#' BIC and AIC can be used with the ByFours trajectory method. BICOS must be used with OneShot.
+#' Must pick from the following: BIC, BICOS, AIC, VarPos.
+#' BIC and AIC can be used with any trajectory method. "BICOS" is kept for compatibility and is the same as "BIC".
 #' The old name "BICOpt" is accepted as an alias for "BICOS".
+#' VarPos needs a covariance structure, so it can only be used with OneShot.
+#' "BICPos" is no longer available: it needed a velocity covariance matrix that no trajectory method produces.
 #' @param V_Smooth a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.
 #'
 #' @returns an EstimatedTraj object.
@@ -81,106 +83,40 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
   if(identical(type, "BICOpt")){
     type = "BICOS"
   }
+  
+  if(identical(type, "BICPos")){
+    stop("type = \"BICPos\" is no longer available: it needed a velocity covariance matrix ",
+         "that no trajectory method produces. Use \"BIC\" or \"VarPos\" instead.", call. = FALSE)
+  }
 
-  valid_types = c("BIC", "BICOS", "BICPos", "AIC", "VarPos")
+  valid_types = c("BIC", "BICOS", "AIC", "VarPos")
 
   if(length(type) != 1 || !(type %in% valid_types)){
     stop("type must be one of: ", paste(valid_types, collapse = ", "), call. = FALSE)
   }
+  
+  if(type == "VarPos" && is.null(EstTrajList[[1]]$Cov)){
+    stop("type = \"VarPos\" needs a trajectory with a covariance structure (OneShot). ",
+         "Use \"BIC\" or \"AIC\" instead.", call. = FALSE)
+  }
 
   n_dim = nrow(EstPath$Path[[1]])
+  
+  # Effective sample size: the number of free parameters in the path the 
+  # trajectories were estimated from.
+  EDF = n_dim*splineFreeParams(length(EstPath$Path), inferPathVSmooth(EstPath, default = V_Smooth))
 
-  if(type == "BIC"){
+  if(type %in% c("BIC", "BICOS")){
     
     getBIC = function(cur_traj){
       
       n_models = nrow(cur_traj$Traj[[1]])
-      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
-      n_param = n_models*(4 + V_Smooth*(length(cur_traj$Traj)-1) + (!V_Smooth)*2*(length(cur_traj$Traj)-1))
+      n_param = n_models*splineFreeParams(length(cur_traj$Traj), V_Smooth)
       
-      return(n_param*log(EDF) + EDF*log(stats::median(rowSums(cur_traj$Error[,-1]))))# - 2*getLikelihoodTraj(EstTraj = cur_traj))
+      n_param*log(EDF) + EDF*log(trajErrorStat(cur_traj))
     }
     
-    BIC = sapply(EstTrajList, getBIC)
-    
-    best_index = which.min(BIC)
-    n_splits = EstTrajList[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
-    if(show){
-      print(BIC)
-    }
-    
-  }
-  
-  if(type == "BICOS"){
-    
-    getBIC = function(cur_traj){
-      
-      n_models = nrow(cur_traj$Traj[[1]])
-      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
-      n_param = n_models*(4 + V_Smooth*(length(cur_traj$Traj)-1) + (!V_Smooth)*2*(length(cur_traj$Traj)-1))
-      
-      return(n_param*log(EDF) + EDF*log(sum(cur_traj$Error)/(max(cur_traj$TimeSplits)-min(cur_traj$TimeSplits))))# - 2*getLikelihoodTraj(EstTraj = cur_traj))
-
-    }
-    
-    
-    BIC = sapply(EstTrajList, getBIC)
-    
-    best_index = which.min(BIC)
-    n_splits = EstTrajList[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
-    if(show){
-      print(BIC)
-    }
-    
-  }
-  
-  if(type == "BICPos"){
-    
-    getBICPos = function(cur_traj){
-      
-      t_seq = cur_traj$Error[,1]
-      n_points = length(t_seq)
-      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
-      n_models = nrow(cur_traj$Traj[[1]])
-      n_param = n_models*(4 + V_Smooth*(length(cur_traj)-1) + (!V_Smooth)*2*(length(cur_traj)-1))
-      TimeSplits = cur_traj$TimeSplits
-      Cov = cur_traj$Cov
-      Sigma2 = cur_traj$Sigma2
-      EstVelCov = cur_traj$EstVelCovMat
-      n_dim = nrow(EstVelCov)/n_points
-      Error = cur_traj$Error
-      
-      evaluateIndividualTraj = function(t){
-        cur_traj_index = min(c(max(c(sum((TimeSplits - t)<0),1)), length(TimeSplits)-1))
-        cur_difft = t - TimeSplits[cur_traj_index]
-        trans_mat = matrix(c(cur_difft^3,cur_difft^2,cur_difft,1), nrow = 4)
-        
-        (mean(apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1] + sum(EstVelCov[(0:(n_dim-1))*n_points + which(t_seq == t), (0:(n_dim-1))*n_points + which(t_seq == t)]) + Sigma2[[cur_traj_index]][x]})))*(mean(colMeans(Error[,-1])))
-        
-      }
-      
-      cur_PosVar = unname(stats::quantile(apply(matrix(t_seq), MARGIN = 1, FUN = evaluateIndividualTraj), probs = c(0.95)))
-      
-      cur_BIC = (n_param)*log(EDF) + EDF*log(stats::median(unlist(as.vector(cur_traj$Error[,-1]))))
-      
-      cur_BIC / cur_PosVar
-      
-      
-    }
-    
-    BIC_Pos = sapply(EstTrajList, getBICPos)
-    
-    best_index = which.min(BIC_Pos)
-    n_splits = EstTrajList[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
-    if(show){
-      print(BIC_Pos)
-    }
+    criterion = sapply(EstTrajList, getBIC)
     
   }
   
@@ -189,21 +125,12 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getAIC = function(cur_traj){
       
       n_models = nrow(cur_traj$Traj[[1]])
-      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       
-      return(2*(2*n_models*(length(cur_traj$Traj)+1)) + EDF*log(stats::median(unlist(as.vector(cur_traj$Error[,1]))))) # - 2*getLikelihoodTraj(EstTraj = cur_traj))
+      2*(2*n_models*(length(cur_traj$Traj)+1)) + EDF*log(trajErrorStat(cur_traj))
       
     }
     
-    AIC = sapply(EstTrajList, getAIC)
-    
-    best_index = which.min(AIC)
-    n_splits = EstTrajList[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
-    if(show){
-      print(AIC)
-    }
+    criterion = sapply(EstTrajList, getAIC)
     
   }
   
@@ -212,7 +139,6 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
     getMaxEstPosVar = function(cur_traj){
       
       t_seq = seq(min(cur_traj$TimeSplits), max(cur_traj$TimeSplits), by = 0.01)
-      EDF = n_dim*(4 + V_Smooth*(length(EstPath$Path)-1) + (!V_Smooth)*2*(length(EstPath$Path)-1))
       n_models = nrow(cur_traj$Traj[[1]])
       TimeSplits = cur_traj$TimeSplits
       Cov = cur_traj$Cov
@@ -231,19 +157,17 @@ getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smo
       
     }
     
-    max_PosVar = sapply(EstTrajList, FUN = getMaxEstPosVar, simplify = T)
+    criterion = sapply(EstTrajList, FUN = getMaxEstPosVar, simplify = T)
     
-    best_index = which.min(max_PosVar)
-    n_splits = EstTrajList[[best_index]]$n_splits
-    
-    print(stringr::str_c("Best Number of Splits was ", n_splits,"."))
-    if(show){
-      print(max_PosVar)
-    }
-    
+  }
+  
+  best_index = which.min(criterion)
+  
+  reportBestRegions(length(EstTrajList[[best_index]]$Traj))
+  if(show){
+    print(criterion)
   }
   
   EstTrajList[[best_index]]
   
 }
-

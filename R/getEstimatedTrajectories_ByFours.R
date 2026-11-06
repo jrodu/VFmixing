@@ -11,7 +11,8 @@
 #' @param data_int a numeric scalar. The time grid size used to constrict the trajectory data set.
 #' @param Random_Path a boolean. TRUE if the path used to construct the trajectory data set should be drawn at random. 
 #' If TRUE, the path must've been estimated using the FullRegression or Projection methods.
-#' @param Path_V_Smooth a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only needed if Random_Path = TRUE.
+#' @param Path_V_Smooth a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only used if Random_Path = TRUE.
+#' If missing, it is detected from EstPath.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -26,6 +27,10 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   n_dim = nrow(EstPath$Path[[1]])
   
+  if(missing(Path_V_Smooth)){
+    Path_V_Smooth = inferPathVSmooth(EstPath)
+  }
+  
   t_seq = seq(min(EstPath$TimeSplits), max(EstPath$TimeSplits), by = data_int)
   
   if(Random_Path){
@@ -36,7 +41,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
       
     } else{
       rand_path = list(Path = generateRandomPath(EstPath$Free_Parameters, EstPath$Free_Parameter_Cov, EstPath$TimeSplits, Path_V_Smooth), TimeSplits = EstPath$TimeSplits)
-      rand_vel = list(Path = generateRandomPath(EstVel$Free_Parameters, EstVel$Free_Parameter_Cov, EstVel$TimeSplits, Path_V_Smooth), TimeSplits = EstVel$TimeSplits)
+      rand_vel = list(Path = generateRandomPath(EstVel$Free_Parameters, EstVel$Free_Parameter_Cov, EstVel$TimeSplits, inferPathVSmooth(EstVel, default = Path_V_Smooth)), TimeSplits = EstVel$TimeSplits)
       
       path_data = cbind(t_seq, getEstPathPosition(t_seq, rand_path), getEstPathPosition(t_seq, rand_vel))
     }
@@ -123,7 +128,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   pos_splits = unname(table(split_labels_unique) >= 8*n_models/n_dim)
   
-  all_splits_est_traj[[1]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 0, PosSplits = pos_splits)
+  all_splits_est_traj[[1]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 1, PosSplits = pos_splits)
   
   ### 1 Split
   
@@ -192,7 +197,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   pos_splits = unname(table(split_labels_unique) >= 8*n_models/n_dim)
   
-  all_splits_est_traj[[2]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 1, PosSplits = pos_splits)
+  all_splits_est_traj[[2]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 2, PosSplits = pos_splits)
   
   # 2 Splits 
   
@@ -269,7 +274,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   pos_splits = unname(table(split_labels_unique) >= 8*n_models/n_dim)
   
-  all_splits_est_traj[[3]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 2, PosSplits = pos_splits)
+  all_splits_est_traj[[3]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 3, PosSplits = pos_splits)
   
   ## 4 Splits
   
@@ -353,7 +358,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   pos_splits = unname(table(split_labels_unique) >= 8*n_models/n_dim)
   
-  all_splits_est_traj[[4]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 3, PosSplits = pos_splits)
+  all_splits_est_traj[[4]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 4, PosSplits = pos_splits)
   
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
@@ -782,7 +787,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
     
     pos_splits = unname(table(split_labels_unique) >= 8*n_models/n_dim)
     
-    all_splits_est_traj[[length(all_splits_est_traj)+1]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = length(est_traj)-1, PosSplits = pos_splits)
+    all_splits_est_traj[[length(all_splits_est_traj)+1]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = length(est_traj), PosSplits = pos_splits)
     
     svMisc::progress(length(est_traj)-1, max.value = nsplits, progress.bar = T, console = T)
     

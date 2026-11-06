@@ -278,7 +278,10 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
     
   }
   
-  colMeans(matrix((apply(matrix(1:length(t_seq)), MARGIN = 1, FUN = isInInterval))))
+  # apply() returns one column per time point and one row per model.
+  inInterval_mat = matrix(apply(matrix(1:length(t_seq)), MARGIN = 1, FUN = isInInterval), nrow = n_models)
+  
+  rowMeans(inInterval_mat)
   
   
   

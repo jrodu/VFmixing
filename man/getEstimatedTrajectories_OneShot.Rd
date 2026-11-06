@@ -9,7 +9,7 @@ getEstimatedTrajectories_OneShot(
   nsplits,
   baseVectorFields,
   V_Smooth = F,
-  Model_Selection_Type = "BICOS",
+  Model_Selection_Type = "BIC",
   Random_Path = F
 )
 }
@@ -20,13 +20,14 @@ getEstimatedTrajectories_OneShot(
 
 \item{baseVectorFields}{a baseVectorField object.}
 
-\item{V_Smooth}{a boolean. TRUE if the spline should have C2 smoothness. FALSE if C1.}
+\item{V_Smooth}{a boolean. TRUE if the trajectory spline should have C2 smoothness. FALSE if C1.
+The path's smoothness is detected from EstPath, so it does not need to match.}
 
 \item{Model_Selection_Type}{a string. The model criterion.
-Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.}
+Must pick from the following: BIC, BICOS, AIC, VarPos. See \code{\link[=getBestSplitsTraj]{getBestSplitsTraj()}}.}
 
 \item{Random_Path}{a boolean. TRUE if the path used to estimate the trajectories should be randomly generated.
-If TRUE, the path must've been estimated using the FullRegression or Projection method.}
+If TRUE, the path must've been estimated using the FullRegression, Projection or FullFours method.}
 }
 \value{
 an EstimatedTrajectory object.
@@ -35,9 +36,11 @@ an EstimatedTrajectory object.
 getEstimatedTrajectories_OneShot
 }
 \examples{
+\donttest{
 ExEstTraj_OneShot = getEstimatedTrajectories_OneShot(
      EstPath = ExEstPath_FullFours, 
      nsplits = 100, baseVectorFields = baseVectorFields, 
-     V_Smooth = FALSE, Model_Selection_Type = "BICOS", Random_Path = FALSE)
+     V_Smooth = FALSE, Model_Selection_Type = "BIC", Random_Path = FALSE)
+}
     
 }

@@ -15,9 +15,11 @@ They should all be related using the same path with an increasing number of spli
 \item{show}{a boolean. TRUE if the criterion values should be displayed.}
 
 \item{type}{a string. The model criterion.
-Must pick from the following: BIC, BICOS, BICPos, AIC, VarPos.
-BIC and AIC can be used with the ByFours trajectory method. BICOS must be used with OneShot.
-The old name "BICOpt" is accepted as an alias for "BICOS".}
+Must pick from the following: BIC, BICOS, AIC, VarPos.
+BIC and AIC can be used with any trajectory method. "BICOS" is kept for compatibility and is the same as "BIC".
+The old name "BICOpt" is accepted as an alias for "BICOS".
+VarPos needs a covariance structure, so it can only be used with OneShot.
+"BICPos" is no longer available: it needed a velocity covariance matrix that no trajectory method produces.}
 
 \item{V_Smooth}{a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.}
 }

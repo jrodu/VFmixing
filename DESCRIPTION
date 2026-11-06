@@ -13,16 +13,17 @@ Suggests:
     leaflet,
     leaflet.extras2,
     plotly,
-    RColorBrewer,
     shiny,
     shinyjs,
+    testthat (>= 3.0.0),
     tidyr,
     waiter
+Config/testthat/edition: 3
 Imports: 
     cubature,
     dplyr,
     fastmatrix,
-    ggplot2,
+    ggplot2 (>= 3.4.0),
     ggpubr,
     grid,
     gtools,
@@ -30,6 +31,7 @@ Imports:
     Matrix,
     mvtnorm,
     pracma,
+    RColorBrewer,
     RcppArmadillo,
     stats,
     stringr,

@@ -37,11 +37,13 @@ drifterVisualizationTool = function(path, traj_list, baseVectorFields, propagati
                                     model_colors, method_colors, 
                                     vector_field_arrow_scale, vector_field_grid_resolution){
   
-  if (!requireNamespace("leaflet","leaflet.extras2","plotly","RColorBrewer",
-                        "shiny","shinyjs","tidyr","waiter", quietly = TRUE)) {
+  needed_pkgs = c("leaflet", "leaflet.extras2", "plotly", "shiny", "shinyjs", "tidyr", "waiter")
+  missing_pkgs = needed_pkgs[!vapply(needed_pkgs, requireNamespace, logical(1), quietly = TRUE)]
+
+  if (length(missing_pkgs) > 0) {
     stop(
-      "Packages \"leaflet\",\"leaflet.extras2\",\"plotly\",\"RColorBrewer\",
-                        \"shiny\",\"shinyjs\",\"tidyr\", and \"waiter\" must be installed to use this function.",
+      "These packages must be installed to use this function: ",
+      paste0("\"", missing_pkgs, "\"", collapse = ", "), ".",
       call. = FALSE
     )
   }
