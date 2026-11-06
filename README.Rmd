@@ -81,7 +81,15 @@ to the "ByFours" candidates, so they stay fast. The covariance-based criteria
 on every candidate, so they are slower.
 
 ```{r, results = "hide"}
-EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
+PathTime <- system.time(
+  EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
+)
+```
+
+The run time, in seconds:
+
+```{r}
+PathTime
 ```
 
 ```{r}
@@ -123,8 +131,37 @@ path error. A faster alternative without a covariance structure is
 `getEstimatedTrajectories_ByFours()`.
 
 ```{r, results = "hide"}
-EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
-                                            baseVectorFields = baseVectorFields)
+TrajTime <- system.time(
+  EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
+                                              baseVectorFields = baseVectorFields)
+)
+```
+
+The run time, in seconds:
+
+```{r}
+TrajTime
+```
+
+By default, every candidate up to `nsplits` is fit before the best one is
+chosen. The `patience` argument stops the search once that many candidates in
+a row have failed to improve the selection criterion. This is much faster when
+the best model has few regions, but it can miss a better model that would only
+appear after a long run without improvement, so it is off by default.
+
+```{r, results = "hide"}
+PatienceTime <- system.time(
+  EstTrajPatience <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
+                                                      baseVectorFields = baseVectorFields,
+                                                      patience = 10)
+)
+```
+
+```{r}
+PatienceTime
+
+# Same trajectory as the full search?
+isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
 ```
 
 ```{r}

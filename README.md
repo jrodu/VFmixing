@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x0000022ba06937a8>
+#> <bytecode: 0x0000027cf87616d0>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -85,7 +85,17 @@ covariance-based criteria (`"BICVel"`, `"VarPos"`, `"VarVel"` and
 slower.
 
 ``` r
-EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
+PathTime <- system.time(
+  EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
+)
+```
+
+The run time, in seconds:
+
+``` r
+PathTime
+#>    user  system elapsed 
+#>    0.31    0.00    0.31
 ```
 
 ``` r
@@ -93,7 +103,7 @@ visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
                  x_var = 'X1', y_var = 'X2')
 ```
 
-<img src="man/figures/README-unnamed-chunk-5-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-6-1.png" width="100%" />
 
 This estimated path is also included in the package as
 `ExEstPath_FullFours`.
@@ -132,8 +142,43 @@ small window defined by the path error. A faster alternative without a
 covariance structure is `getEstimatedTrajectories_ByFours()`.
 
 ``` r
-EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
-                                            baseVectorFields = baseVectorFields)
+TrajTime <- system.time(
+  EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
+                                              baseVectorFields = baseVectorFields)
+)
+```
+
+The run time, in seconds:
+
+``` r
+TrajTime
+#>    user  system elapsed 
+#>    5.52    0.17    5.77
+```
+
+By default, every candidate up to `nsplits` is fit before the best one
+is chosen. The `patience` argument stops the search once that many
+candidates in a row have failed to improve the selection criterion. This
+is much faster when the best model has few regions, but it can miss a
+better model that would only appear after a long run without
+improvement, so it is off by default.
+
+``` r
+PatienceTime <- system.time(
+  EstTrajPatience <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
+                                                      baseVectorFields = baseVectorFields,
+                                                      patience = 10)
+)
+```
+
+``` r
+PatienceTime
+#>    user  system elapsed 
+#>    0.02    0.02    0.05
+
+# Same trajectory as the full search?
+isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
+#> [1] TRUE
 ```
 
 ``` r
@@ -144,7 +189,7 @@ visualizeEstTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                  CL = 0.95, P_Int = T, Cos_Cutoff = 0.91)
 ```
 
-<img src="man/figures/README-unnamed-chunk-7-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-11-1.png" width="100%" />
 
 In the plot above, we can see our estimate of the trajectory (solid
 line) next to the true trajectories used to construct the data (dashed
