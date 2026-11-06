@@ -6,35 +6,28 @@
 \usage{
 runEstTrajStep_OneShot(
   EstPath,
-  baseVectorFields,
   TimeSplits,
-  worst_split,
-  cur_integral_list_traj,
-  cur_integral_list_pathtraj,
+  RegionCaches,
+  Omega_p,
   n_dim,
   n_models,
-  Path_VSmooth,
   Traj_VSmooth
 )
 }
 \arguments{
-\item{EstPath}{an EtsimatedPath object.}
+\item{EstPath}{an EstimatedPath object.}
 
-\item{baseVectorFields}{a baseVectorFields functions.}
+\item{TimeSplits}{a numeric vector. The nodes of the trajectory spline with the starting and ending times.}
 
-\item{TimeSplits}{a numeric vector. The nodes of the spline with the starting and ending times.}
+\item{RegionCaches}{a list with one element per trajectory region, as built internally by
+\code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}. Each holds the quadrature nodes, the base vector fields and
+path velocity at those nodes, and the region's blocks of the integral matrices.}
 
-\item{worst_split}{a numeric scalar. The region to be split.}
-
-\item{cur_integral_list_traj}{a list of matrices. Each corresponds with a block of the current overall trajectory integral matrix.}
-
-\item{cur_integral_list_pathtraj}{a list of matrices. Each corresponds with a block of the current overall PathTrajectory integral matrix.}
+\item{Omega_p}{a numeric matrix. The transition matrix from the path free parameters to the full path coefficients.}
 
 \item{n_dim}{a numeric scalar. The number of dimensions in the path.}
 
 \item{n_models}{a numeric scalar. The number of vector fields being mixed.}
-
-\item{Path_VSmooth}{a boolean. TRUE if the path was estimated using C2 smoothness. FALSE if C1.}
 
 \item{Traj_VSmooth}{a boolean. TRUE if the trajectory should be estimated using C2 smoothness. FALSE if C1.}
 }
@@ -42,5 +35,6 @@ runEstTrajStep_OneShot(
 an EstimatedTrajectory object.
 }
 \description{
-runEstTrajStep_OneShot
+One candidate in the OneShot trajectory method: the trajectory spline for a
+given set of nodes. Called by \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}.
 }
