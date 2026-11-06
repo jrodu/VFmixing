@@ -4,7 +4,16 @@
 \alias{visualizeEstPath}
 \title{visualizeEstPath}
 \usage{
-visualizeEstPath(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1")
+visualizeEstPath(
+  Data,
+  EstPath,
+  t_grid_size = 0.01,
+  x_var = "t",
+  y_var = "X1",
+  CL = 0.95,
+  P_Int = T,
+  n_ellipses = 20
+)
 }
 \arguments{
 \item{Data}{a numeric data frame. The first column is the time and the remaining columns are the positions.}
@@ -13,18 +22,50 @@ visualizeEstPath(Data, EstPath, t_grid_size = 0.01, x_var = "t", y_var = "X1")
 
 \item{t_grid_size}{a positive numeric scalar. The time grid size of the plotting.}
 
-\item{x_var}{a string. The variable name to plot on the x-axis.}
+\item{x_var}{a string. The variable name to plot on the x-axis: "t", "X1", "X2", ...}
 
 \item{y_var}{a string. The variable name to plot on the y-axis.}
+
+\item{CL}{a real number between 0 and 1. The confidence level of the intervals.}
+
+\item{P_Int}{a boolean. TRUE for prediction intervals (path uncertainty plus observation noise),
+FALSE for confidence intervals on the path.}
+
+\item{n_ellipses}{a positive integer. The number of ellipses drawn when both axes are positions.}
 }
 \value{
 a ggplot2 object.
 }
 \description{
-visualizeEstPath
+Plot an estimated path with the data and, when the path has a covariance
+structure (FullFours, FullRegression or Projection), its uncertainty.
+}
+\details{
+The interval for dimension \eqn{d} at time \eqn{t} uses the variance
+\eqn{b(t)^T \Sigma_d b(t)}, where \eqn{b(t)} is the cubic basis and
+\eqn{\Sigma_d} the coefficient covariance. This gives a confidence interval
+for the path itself. With \code{P_Int = TRUE} the observation noise
+\eqn{\sigma^2_d} is added, which gives a prediction interval for a new
+observation: the interval that \code{\link[=coverageRatePath]{coverageRatePath()}} checks the data against.
+
+How the uncertainty is drawn depends on the axes:
+\itemize{
+\item If one axis is time (\code{"t"}), the interval for the other variable is drawn
+as a shaded band.
+\item If both axes are positions, an ellipse is drawn at \code{n_ellipses} evenly
+spaced times. The dimensions are estimated separately, so the ellipses are
+axis-aligned. They are joint regions for the two coordinates at level \code{CL}
+(radius \eqn{\sqrt{\chi^2_{2, CL}}} standard deviations), so they are wider
+than the per-dimension intervals.
+}
+
+Paths without a covariance structure (ByFours) are drawn without intervals.
 }
 \examples{
-visualizeEstPath(ExData, ExEstPath_ByFours, t_grid_size = 0.01, 
-                 x_var = 'X1',y_var = 'X2')
-      
+# Position plot with 95\% prediction ellipses
+visualizeEstPath(ExData, ExEstPath_FullFours, x_var = 'X1', y_var = 'X2')
+
+# One dimension over time with a 95\% confidence band for the path
+visualizeEstPath(ExData, ExEstPath_FullFours, x_var = 't', y_var = 'X1', P_Int = FALSE)
+
 }

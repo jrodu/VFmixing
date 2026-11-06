@@ -95,10 +95,36 @@ The run time, in seconds:
 PathTime
 ```
 
+Because the "FullFours" path has a covariance structure, the plot can show its
+uncertainty. By default these are 95% prediction intervals for a new
+observation: the uncertainty in the fitted path plus the observation noise
+(`P_Int = FALSE` shows a confidence interval for the path itself instead). When
+both axes are positions, they are drawn as ellipses at evenly spaced times:
+
 ```{r}
 visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
                  x_var = 'X1', y_var = 'X2')
 ```
+
+With time on one axis, the interval is drawn as a band:
+
+```{r}
+visualizeEstPath(Data = Data, EstPath = EstPath, t_grid_size = 0.01,
+                 x_var = 't', y_var = 'X1')
+```
+
+We can also check how well this uncertainty is calibrated. `coverageRatePath()`
+uses the same 95% prediction intervals at each data time and reports, for each
+dimension, the share of data points that fall inside them.
+
+```{r}
+PathCovRate = coverageRatePath(EstPath = EstPath, Data = Data, CL = 0.95)
+PathCovRate
+```
+
+The coverage rates for `r paste(names(Data)[-1], collapse = " and ")` are
+`r paste0(round(100*PathCovRate, 1), "%", collapse = " and ")`, close to the
+nominal 95%.
 
 This estimated path is also included in the package as `ExEstPath_FullFours`.
 
