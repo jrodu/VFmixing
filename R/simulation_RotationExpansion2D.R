@@ -105,8 +105,10 @@ runSimulationStudy_RotationExpansion2D = function(seed,
     matrix(c(rot, ex), nrow = 2, byrow = F)
 
   }
-  # A clean environment, so saving the returned function doesn't also save
-  # everything else inside this study.
+  # No source references and a clean environment, so saving the returned
+  # function doesn't also save the source file or everything else inside
+  # this study.
+  vectorFields = utils::removeSource(vectorFields)
   environment(vectorFields) = baseenv()
 
   n_dim = 2
