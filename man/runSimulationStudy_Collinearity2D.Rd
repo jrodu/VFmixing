@@ -19,7 +19,8 @@ runSimulationStudy_Collinearity2D(
   k = 0.5,
   start_range = c(-100, 100),
   keep_fits = TRUE,
-  quiet = TRUE
+  quiet = TRUE,
+  progress = TRUE
 )
 }
 \arguments{
@@ -51,6 +52,9 @@ The maximum number of splits for the path search.}
 \item{keep_fits}{a boolean. If TRUE, the fitted paths and trajectories are returned as well.}
 
 \item{quiet}{a boolean. If TRUE, the progress output of the estimation functions is suppressed.}
+
+\item{progress}{a boolean. If TRUE, a time-stamped message is printed as each data set is
+simulated and each fit finishes, and the total time at the end.}
 }
 \value{
 a list with:
