@@ -35,83 +35,67 @@ getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC"
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
   
-  time_splits = stats::fivenum(Data$t)
+  # Start from a single region. The local "by fours" update needs at least
+  # four regions to work with, so the first candidates are fit with the full
+  # C1 spline regression (the same spline space ByFours fits) and split the
+  # same way as below: the region with the largest squared error, at the
+  # median time of its data.
+  time_splits = range(Data$t)
   
   all_splits_est_path = list()
   
-  est_path = list()
-  
-  cur_path1 = c()
-  cur_path2 = c()
-  cur_path3 = c()
-  cur_path4 = c()
-  cur_Data = Data
-  
-  split_labels = cut(x = Data$t, breaks = time_splits, include.lowest = T, right = T, labels = 1:(length(time_splits)-1))
-  split_labels_unique = cut(x = unique(Data$t), breaks = time_splits, include.lowest = T, right = T, labels = 1:(length(time_splits)-1))
-  
-  runRegressionInit = function(dim,start_split, end_split,split_labels){
-    
-    a1 = ((cur_Data$t - time_splits[start_split])^3)*(split_labels == start_split) +
-      (3*(time_splits[start_split+1]-time_splits[start_split])^2*(cur_Data$t - time_splits[start_split+1]) + (time_splits[start_split+1] - time_splits[start_split])^3)*(split_labels %in% c((start_split+1):end_split))
-    b1 = ((cur_Data$t - time_splits[start_split])^2)*(split_labels == start_split) +
-      (2*(time_splits[start_split+1]-time_splits[start_split])*(cur_Data$t - time_splits[start_split+1]) + (time_splits[start_split+1] - time_splits[start_split])^2)*(split_labels %in% c((start_split+1):end_split))
-    c1 = cur_Data$t - time_splits[start_split]
-    d1 = 1*(split_labels %in% c(start_split:end_split))
-    
-    cur_X = cbind(a1,b1,c1,d1)
-    
-    for(j in (start_split+1):end_split){
-      cur_a = ((cur_Data$t - time_splits[j])^3)*(split_labels == j) +
-        (3*(time_splits[j+1]-time_splits[j])^2*(cur_Data$t - time_splits[j+1]) + (time_splits[j+1] - time_splits[j])^3)*(split_labels %in% c((j+1):end_split))*(j!=end_split)
-      cur_b = ((cur_Data$t - time_splits[j])^2)*(split_labels == j) +
-        (2*(time_splits[j+1]-time_splits[j])*(cur_Data$t - time_splits[j+1]) + (time_splits[j+1] - time_splits[j])^2)*(split_labels %in% c((j+1):end_split))*(j!=end_split)
-      cur_X = cbind(cur_X, cur_a, cur_b)
-    }
-    cur_Y = cur_Data[,dim+1]
-    
-    cur_coef = unname(RcppArmadillo::fastLmPure(cur_X, cur_Y)$coefficients)
-    
-    cur_coef
-    
+  asByFours = function(fit){
+    list(Path = fit$Path, TimeSplits = fit$TimeSplits, Error = fit$Error, n_splits = length(fit$Path), PosSplits = fit$PosSplits)
   }
   
-  for(i in 1:n_dim){
-    
-    cur_coef = runRegressionInit(i,1,4,split_labels)
-    
-    cur_path1 = rbind(cur_path1, unname(cur_coef[1:4]))
-    cur_path2 = rbind(cur_path2, c(unname(cur_coef[5:6]), evaluateCubicVelocity(time_splits[2], cur_path1[i,], startTime = time_splits[1]), evaluateCubic(time_splits[2], cur_path1[i,], startTime = time_splits[1])))
-    cur_path3 = rbind(cur_path3, c(unname(cur_coef[7:8]), evaluateCubicVelocity(time_splits[3], cur_path2[i,], startTime = time_splits[2]), evaluateCubic(time_splits[3], cur_path2[i,], startTime = time_splits[2])))
-    cur_path4 = rbind(cur_path4, c(unname(cur_coef[9:10]), evaluateCubicVelocity(time_splits[4], cur_path3[i,], startTime = time_splits[3]), evaluateCubic(time_splits[4], cur_path3[i,], startTime = time_splits[3])))
-    
-  }
+  fit = runEstPathStep_FullRegression(Data, time_splits, V_Smooth = F)
+  all_splits_est_path[[1]] = asByFours(fit)
+  stop_early = !is.null(patience) && tracker$add(all_splits_est_path[[1]])
   
-  est_path[[1]] = cur_path1
-  est_path[[2]] = cur_path2
-  est_path[[3]] = cur_path3
-  est_path[[4]] = cur_path4
-  
-  pos_splits = unname(table(split_labels_unique) >= 8)
-  
-  #Calculating Initial Error Matrix
-  
-  est_pos = rbind(evaluateCubic(Data$t[split_labels == 1],Cubic = est_path[[1]], startTime = time_splits[1]),
-                  evaluateCubic(Data$t[split_labels == 2],Cubic = est_path[[2]], startTime = time_splits[2]),
-                  evaluateCubic(Data$t[split_labels == 3],Cubic = est_path[[3]], startTime = time_splits[3]),
-                  evaluateCubic(Data$t[split_labels == 4],Cubic = est_path[[4]], startTime = time_splits[4]))
-  
-  Error_mat = cbind(t = cur_Data$t,(cur_Data[,-1] - est_pos)^2)
-  
-  all_splits_est_path[[1]] = list(Path = est_path, TimeSplits = time_splits, Error = Error_mat, n_splits = 4, PosSplits = pos_splits)
-
-  if(!is.null(patience)){
-    tracker$add(all_splits_est_path[[1]])
-  }
-
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
-  while(length(time_splits)-1 <= nsplits){
+  while(!stop_early && length(fit$Path) < 4 && length(time_splits) - 1 <= nsplits){
+    
+    last = all_splits_est_path[[length(all_splits_est_path)]]
+    
+    if(sum(last$PosSplits) == 0){
+      break
+    }
+    
+    worst_split = which.max(unname(by(rowSums(last$Error[,-1]), fit$SplitLabels, sum))*last$PosSplits)
+    new_splits = c(time_splits[1:worst_split], stats::median(Data$t[fit$SplitLabels == worst_split]), time_splits[(worst_split+1):length(time_splits)])
+    
+    new_fit = tryCatch(runEstPathStep_FullRegression(Data, new_splits, V_Smooth = F), error = function(e){NULL})
+    
+    if(is.null(new_fit)){
+      # This region can't be split; try another one
+      all_splits_est_path[[length(all_splits_est_path)]]$PosSplits[worst_split] = FALSE
+      next
+    }
+    
+    fit = new_fit
+    time_splits = new_splits
+    all_splits_est_path[[length(all_splits_est_path) + 1]] = asByFours(fit)
+    stop_early = !is.null(patience) && tracker$add(all_splits_est_path[[length(all_splits_est_path)]])
+    
+    svMisc::progress(length(time_splits) - 2, max.value = nsplits, progress.bar = T, console = T)
+    
+  }
+  
+  # Continue with the by-fours updates from the four-region fit
+  est_path = fit$Path
+  Error_mat = fit$Error
+  split_labels = fit$SplitLabels
+  split_labels_unique = cut(x = unique(Data$t), breaks = time_splits, include.lowest = T, right = T, labels = 1:(length(time_splits)-1))
+  pos_splits = all_splits_est_path[[length(all_splits_est_path)]]$PosSplits
+  
+  if(length(fit$Path) < 4 || sum(pos_splits) == 0){
+    stop_early = TRUE
+  }
+  
+
+  
+  while(!stop_early && length(time_splits)-1 <= nsplits){
     
     worst_split = which.max(unname(by(rowSums(all_splits_est_path[[length(all_splits_est_path)]]$Error[,-1]), split_labels, sum))*pos_splits)
     time_splits = c(time_splits[1:worst_split], stats::median(Data$t[split_labels == worst_split]), time_splits[(worst_split+1):length(time_splits)])

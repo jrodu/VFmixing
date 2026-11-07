@@ -11,7 +11,8 @@ getEstimatedTrajectories_ByFours(
   baseVectorFields,
   data_int = 0.001,
   Random_Path = F,
-  Path_V_Smooth
+  Path_V_Smooth,
+  patience = NULL
 )
 }
 \arguments{
@@ -30,6 +31,10 @@ If TRUE, the path must've been estimated using the FullRegression or Projection 
 
 \item{Path_V_Smooth}{a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only used if Random_Path = TRUE.
 If missing, it is detected from EstPath.}
+
+\item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
+Otherwise, stop the node search after this many consecutive candidates that do not improve the BIC.
+This is faster, but it can miss a better model that only appears after a long run without improvement.}
 }
 \value{
 an EstimatedTrajectory object.

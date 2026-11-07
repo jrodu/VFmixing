@@ -53,3 +53,18 @@ test_that("path smoothness is detected from the free parameters", {
   expect_false(VFmixing:::inferPathVSmooth(ExEstPath_ByFours))
   expect_continuous_at_nodes(c2)
 })
+
+test_that("every search starts from a single region", {
+  bf = quietly(getEstimatedPaths_ByFours(ExData, 10, return_all = TRUE))
+  expect_equal(vapply(bf, function(x) length(x$Path), numeric(1))[1:5], 1:5)
+  expect_equal(bf[[1]]$TimeSplits, range(ExData$t))
+
+  # Data that one cubic describes well runs through every method
+  set.seed(1)
+  data = stats::setNames(data.frame(t = seq(0, 1, length.out = 200), X1 = 0, X2 = 0), c("t", "X1", "X2"))
+  data$X1 = data$t^3 + stats::rnorm(200, 0, 0.01)
+  data$X2 = 2*data$t + stats::rnorm(200, 0, 0.01)
+  for(f in list(getEstimatedPaths_ByFours, getEstimatedPaths_FullFours, getEstimatedPaths_FullRegression, getEstimatedPaths_Projection)){
+    expect_no_error(quietly(f(data, 10)))
+  }
+})

@@ -78,11 +78,15 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
   
   integral_list = constructIntegralMatrixList_Path(cur_integral_list, time_splits, worst_split)
   
-  Z = as.matrix(Matrix::bdiag(integral_list))
+  n_regions = length(time_splits) - 1
   
   V = constructUnboundedCubicSplineTransitionMatrix_Path(time_splits, V_Smooth = V_Smooth)
   
-  VtZV = t(V) %*% Z %*% V
+  # Z is block diagonal (one 4 x 4 block per region), so Z %*% V is formed
+  # block by block instead of from the full matrix.
+  ZV = blockDiagTimes(integral_list, V)
+  
+  VtZV = crossprod(V, ZV)
   
   qr_decomp_VtZV = qr(VtZV)
   
@@ -94,39 +98,39 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
     VtZV_inv = pracma::pinv(VtZV)
   }
   
-  Free_Param_Matrix = VtZV_inv %*% t(V) %*% Z
-  
-  Hat_Matrix = (V %*% Free_Param_Matrix)
+  # (V'ZV)^+ V'Z, using that Z is symmetric
+  Free_Param_Matrix = VtZV_inv %*% t(ZV)
   
   free_param_coefs = t(Free_Param_Matrix %*% t(unrestricted_coefs_mat))
   
-  restricted_coefs = t(Hat_Matrix %*% t(unrestricted_coefs_mat))
+  # The restricted coefficients are V times the free parameters (Hat = V F)
+  restricted_coefs = t(V %*% t(free_param_coefs))
   
-  EstPath = lapply(unname(split(seq_len(ncol(restricted_coefs)), ceiling(seq_len(ncol(restricted_coefs)) / 4))), function(cols) restricted_coefs[, cols, drop = FALSE])
+  EstPath = lapply(seq_len(n_regions), function(r){restricted_coefs[, 1:4 + 4*(r-1), drop = FALSE]})
   
   unrestricted_cov_perdim = lapply(as.list(1:n_dim), FUN = function(x){lapply(unrestricted_cov, `[[`, x)})
   
-  full_restricted_cov = lapply(unrestricted_cov_perdim, FUN = function(cov){Hat_Matrix %*% as.matrix(Matrix::bdiag(cov)) %*% t(Hat_Matrix)})
+  # F B F' with B block diagonal, then V (F B F') V' = Hat B Hat'
+  free_param_cov = lapply(unrestricted_cov_perdim, FUN = function(cov){
+    FB = timesBlockDiag(Free_Param_Matrix, cov)
+    tcrossprod(FB, Free_Param_Matrix)
+  })
   
-  restricted_cov_perdim = lapply(full_restricted_cov, FUN = function(cov){lapply(as.list(1:(length(time_splits) - 1)), FUN = function(x){cov[1:4 + 4*(x-1),1:4 + 4*(x-1)]})})
+  full_restricted_cov = lapply(free_param_cov, FUN = function(cov){V %*% tcrossprod(cov, V)})
   
-  restricted_cov = lapply(as.list(1:(length(time_splits)-1)), FUN = function(x){lapply(restricted_cov_perdim, `[[`, x)})
+  restricted_cov_perdim = lapply(full_restricted_cov, FUN = function(cov){lapply(as.list(1:n_regions), FUN = function(x){cov[1:4 + 4*(x-1),1:4 + 4*(x-1)]})})
   
-  free_param_cov = lapply(unrestricted_cov_perdim, FUN = function(cov){Free_Param_Matrix %*% as.matrix(Matrix::bdiag(cov)) %*% t(Free_Param_Matrix)})
+  restricted_cov = lapply(as.list(1:n_regions), FUN = function(x){lapply(restricted_cov_perdim, `[[`, x)})
   
-  est_pos = c()
-  
-  for(i in 1:(length(time_splits)-1)){
-    est_pos = rbind(est_pos, evaluateCubic(Data$t[split_labels == i],Cubic = EstPath[[i]], startTime = time_splits[i]))
-  }
+  est_pos = evaluatePathAt(Data$t, list(Path = EstPath, TimeSplits = time_splits))$pos
   
   Error_mat = cbind(t = Data$t,(Data[,-1] - est_pos)^2)
   
-  Sigma2_list = replicate(length(time_splits)-1, list(unname(colMeans(Error_mat[,-1]))))
+  Sigma2_list = replicate(n_regions, list(unname(colMeans(Error_mat[,-1]))))
   
   pos_splits = unname(table(split_labels_unique) >= 8)
   
-  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = length(time_splits)-1, PosSplits = pos_splits, Cov = restricted_cov, FullCov = full_restricted_cov, Sigma2 = Sigma2_list, SplitLabels = split_labels, UnrestrictedCoef = unrestricted_coefs_list, UnrestrictedCov = unrestricted_cov, IntegralList = integral_list, Free_Parameters = free_param_coefs, Free_Parameter_Cov = free_param_cov)
+  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = n_regions, PosSplits = pos_splits, Cov = restricted_cov, FullCov = full_restricted_cov, Sigma2 = Sigma2_list, SplitLabels = split_labels, UnrestrictedCoef = unrestricted_coefs_list, UnrestrictedCov = unrestricted_cov, IntegralList = integral_list, Free_Parameters = free_param_coefs, Free_Parameter_Cov = free_param_cov)
   
 }
 
@@ -162,11 +166,12 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
   
-  time_splits = c(min(Data$t),stats::median(Data$t),max(Data$t))
+  # Start from a single region and split from there
+  time_splits = range(Data$t)
   
   all_splits_est_path = list()
   
-  all_splits_est_path[[1]] = runEstPathStep_Projection(Data = Data, time_splits = time_splits, cur_unrestricted_coefs = list(), cur_unrestricted_cov = list(list()), cur_integral_list = list(), cur_sigma2_list = list(), worst_split = 1, V_Smooth = V_Smooth)
+  all_splits_est_path[[1]] = projectionSingleRegion(Data = Data, time_splits = time_splits)
 
   if(!is.null(patience)){
     tracker$add(all_splits_est_path[[1]])
@@ -209,3 +214,57 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
 
 
 
+
+# The Projection candidate with a single region. With no interior nodes there
+# are no constraints, so the projection leaves the unrestricted cubic unchanged:
+# the restricted fit, free parameters and covariances are those of the
+# unrestricted regression. The fields match runEstPathStep_Projection() so the
+# search can split from here.
+projectionSingleRegion = function(Data, time_splits){
+
+  n_dim = ncol(Data) - 1
+  h = time_splits[2] - time_splits[1]
+
+  split_labels = cut(x = Data$t, breaks = time_splits, include.lowest = T, right = T, labels = 1)
+  split_labels_unique = cut(x = unique(Data$t), breaks = time_splits, include.lowest = T, right = T, labels = 1)
+
+  coef = c()
+  unrestricted_cov = list()
+
+  for(i in 1:n_dim){
+
+    reg = runUnRestrictedCubicRegression_Path(cur_Data = Data, start_time = time_splits[1], dim = i)
+    coef = rbind(coef, reg[[1]])
+
+    X = reg[[3]]
+    qr_XtX = qr(t(X) %*% X)
+
+    if(qr_XtX$rank == 4){
+      XtX_inv = backsolve(qr.R(qr_XtX), x = diag(4)) %*% t(qr.Q(qr_XtX))
+    } else{
+      XtX_inv = pracma::pinv(t(X) %*% X)
+    }
+
+    unrestricted_cov[[i]] = reg[[2]] * XtX_inv
+
+  }
+
+  # Integral of the cubic basis products over the region (as in constructIntegralMatrixList_Path)
+  powers = outer(1:4, 1:4, function(i, j){9 - i - j})
+  integral_block = h^powers / powers
+
+  EstPath = list(coef)
+
+  est_pos = evaluatePathAt(Data$t, list(Path = EstPath, TimeSplits = time_splits))$pos
+
+  Error_mat = cbind(t = Data$t, (Data[,-1] - est_pos)^2)
+
+  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = 1,
+       PosSplits = unname(table(split_labels_unique) >= 8),
+       Cov = list(unrestricted_cov), FullCov = unrestricted_cov,
+       Sigma2 = list(unname(colMeans(Error_mat[,-1]))), SplitLabels = split_labels,
+       UnrestrictedCoef = list(coef), UnrestrictedCov = list(unrestricted_cov),
+       IntegralList = list(integral_block),
+       Free_Parameters = coef, Free_Parameter_Cov = unrestricted_cov)
+
+}

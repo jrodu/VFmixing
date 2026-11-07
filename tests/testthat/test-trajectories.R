@@ -12,3 +12,18 @@ test_that("OneShot works when path and trajectory smoothness differ", {
   expect_equal(traj$n_splits, length(traj$Traj))
   expect_false(is.null(traj$Cov))
 })
+
+test_that("ByFours trajectories support patience", {
+  full = quietly(getEstimatedTrajectories_ByFours(EstPath = ExEstPath_FullFours, nsplits = 40,
+                                                  baseVectorFields = baseVectorFields, data_int = 0.01))
+  early = quietly(getEstimatedTrajectories_ByFours(EstPath = ExEstPath_FullFours, nsplits = 40,
+                                                   baseVectorFields = baseVectorFields, data_int = 0.01, patience = 10))
+  expect_equal(early$TimeSplits, full$TimeSplits)
+  expect_equal(early$Traj, full$Traj)
+
+  # patience smaller than the four initial candidates still works
+  expect_no_error(quietly(getEstimatedTrajectories_ByFours(EstPath = ExEstPath_FullFours, nsplits = 40,
+                                                           baseVectorFields = baseVectorFields, data_int = 0.01, patience = 1)))
+  expect_error(getEstimatedTrajectories_ByFours(EstPath = ExEstPath_FullFours, nsplits = 40,
+                                                baseVectorFields = baseVectorFields, patience = 0), "patience")
+})
