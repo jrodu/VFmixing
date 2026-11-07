@@ -1,0 +1,302 @@
+#' Collinearity 2-D Simulation Study
+#'
+#' @description
+#' One replicate of the simulation study on how the angle between two vector
+#' fields affects estimation. The two constant fields in 2-D are
+#' \eqn{(1, 0)}, the x-axis, and \eqn{(\cos\theta, \sin\theta)}, so
+#' \eqn{\theta} is the angle between them: they are orthogonal at
+#' \eqn{\theta = \pi/2} and become collinear, with the trajectories harder to
+#' tell apart, as \eqn{\theta} goes to 0. Each replicate draws one angle
+#' \eqn{\theta \sim U(0, \pi/2)}. Then, for every combination of positional
+#' error level and true trajectory complexity, it simulates a data set with
+#' that angle and fits FullFours paths followed by OneShot trajectories,
+#' recording accuracy, coverage, interval width and run time. Run it with
+#' seeds 1, 2, ..., N to reproduce the full study.
+#'
+#' This study is self-contained: everything it needs is defined inside this
+#' function, apart from the package's estimation and evaluation functions.
+#'
+#' @details
+#' **Data.** First \eqn{\theta} is drawn uniformly on `theta_range`, once for
+#' the whole replicate. Then, for each setting, true trajectories with the
+#' complexity's number of equally spaced regions on \eqn{[0, t_{end}]} are
+#' drawn with
+#' [generateFullTrajectory()] (`sigma`, `k`). The true path is the
+#' [RungeKutta()] solution through the trajectory-weighted fields from a start
+#' position drawn uniformly on `start_range` in each dimension, with time step
+#' `t_step`. The observed data add independent normal noise with the error
+#' level's standard deviation to each position. All data sets are simulated
+#' (in a fixed order) before any fitting.
+#'
+#' **Method.** Paths are fitted with [getEstimatedPaths_FullFours()] and
+#' trajectories with [getEstimatedTrajectories_OneShot()], both with BIC
+#' selection, C1 smoothness and `patience`.
+#'
+#' **Metrics.** For each setting:
+#' * `theta`: the replicate's angle, in radians.
+#' * `path_rmse`: root mean squared distance between the estimated and true
+#'   positions at the data times.
+#' * `traj_avg_sq_dist`: [cubicAvgSquareDist()] between the estimated and true
+#'   trajectories.
+#' * `path_coverage_*`: [coverageRatePath()] of the data by the prediction
+#'   intervals, per dimension.
+#' * `traj_coverage_*`: [coverageRateTraj()] of the true trajectories by the
+#'   confidence intervals, per trajectory.
+#' * `path_width_*`: [avgCIWidthPath()] with prediction intervals, per dimension.
+#' * `traj_width_*`: [avgCIWidthTraj()], per trajectory.
+#' * `time_path`, `time_traj`, `time_total`: elapsed seconds.
+#'
+#' If the fit fails, its metrics are `NA` and the error message is recorded.
+#'
+#' @param seed an integer. The random seed for this replicate.
+#' @param error_sd a named numeric vector. The positional error standard deviations, named by level.
+#' @param n_regions a named numeric vector. The number of regions in the true trajectories, named by complexity level.
+#' @param theta_range a numeric vector of length 2 within \eqn{[0, \pi/2]}. The range of the uniform angle, in radians.
+#' @param patience NULL or a positive integer. Passed to the path and trajectory searches.
+#' @param t_end a positive number. The end time of the simulation (it starts at 0).
+#' @param t_step a positive number. The time step of the data and of the Runge-Kutta solution.
+#' @param path_nsplits a positive integer, or NULL for a quarter of the number of data points.
+#' The maximum number of splits for the path search.
+#' @param traj_nsplits a positive integer. The maximum number of splits for the trajectory search.
+#' @param CL a number between 0 and 1. The level of the intervals.
+#' @param sigma,k positive numbers. Passed to [generateFullTrajectory()].
+#' @param start_range a numeric vector of length 2. The range of the uniform start position.
+#' @param keep_fits a boolean. If TRUE, the fitted paths and trajectories are returned as well.
+#' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
+#'
+#' @returns a list with:
+#' * `Seed`: the seed.
+#' * `Settings`: every setting used.
+#' * `Theta`: the replicate's angle, in radians.
+#' * `VectorFields`: the base vector fields function at that angle, e.g. for [visualizeEstTraj()].
+#' * `Results`: a data frame with one row per setting, holding \eqn{\theta} and the metrics.
+#' * `Data`: for each setting, the true trajectory (`TrueTraj`), true path (`TrueData`) and observed data (`SimData`).
+#' * `Fits`: if `keep_fits`, the estimated path and trajectory for each setting.
+#' @export
+#'
+#' @examples
+#' \donttest{
+#' # One replicate with a single, quick setting
+#' run = runSimulationStudy_Collinearity2D(seed = 1, error_sd = c(med = 0.01),
+#'                                         n_regions = c(low = 2), t_end = 5)
+#' run$Results
+#'
+#' # The full study: one replicate per seed
+#' # runs = lapply(1:1000, function(s){
+#' #   runSimulationStudy_Collinearity2D(seed = s, keep_fits = FALSE)
+#' # })
+#' # results = do.call(rbind, lapply(runs, `[[`, "Results"))
+#' }
+#'
+runSimulationStudy_Collinearity2D = function(seed,
+                                             error_sd = c(low = 0.001, med = 0.01, high = 0.1),
+                                             n_regions = c(low = 2, med = 10, high = 50),
+                                             theta_range = c(0, pi/2),
+                                             patience = 10, t_end = 20, t_step = 0.01,
+                                             path_nsplits = NULL, traj_nsplits = 100, CL = 0.95,
+                                             sigma = 0.5, k = 0.5, start_range = c(-100, 100),
+                                             keep_fits = TRUE, quiet = TRUE){
+
+  # ---- The vector fields: the x-axis and a unit vector at angle theta -------
+
+  makeVectorFields = function(theta){
+
+    vectorFields = function(t, curPos){
+
+      x_unit = c(1, 0)
+      angled = c(cos(theta), sin(theta))
+
+      matrix(c(x_unit, angled), nrow = 2, byrow = FALSE)
+
+    }
+    # No source references, and an environment holding only theta, so saving
+    # the function doesn't also save the source file or the rest of the study.
+    vectorFields = utils::removeSource(vectorFields)
+    env = new.env(parent = baseenv())
+    env$theta = theta
+    environment(vectorFields) = env
+    vectorFields
+
+  }
+
+  n_dim = 2
+  n_models = 2
+
+  # ---- Check the arguments --------------------------------------------------
+
+  if(is.null(names(error_sd)) || any(names(error_sd) == "") || any(error_sd < 0)){
+    stop("error_sd must be a named vector of non-negative standard deviations.", call. = FALSE)
+  }
+
+  if(is.null(names(n_regions)) || any(names(n_regions) == "") || any(n_regions < 1) || any(n_regions != round(n_regions))){
+    stop("n_regions must be a named vector of positive whole numbers.", call. = FALSE)
+  }
+
+  if(length(theta_range) != 2 || !is.numeric(theta_range) || theta_range[1] > theta_range[2] ||
+     theta_range[1] < 0 || theta_range[2] > pi/2){
+    stop("theta_range must be an increasing pair of angles within [0, pi/2].", call. = FALSE)
+  }
+
+  if(!is.null(patience) && (length(patience) != 1 || !is.numeric(patience) || patience < 1 || patience != round(patience))){
+    stop("patience must be NULL or a positive whole number.", call. = FALSE)
+  }
+
+  # ---- Settings --------------------------------------------------------------
+
+  settings = expand.grid(error_level = names(error_sd), complexity = names(n_regions), stringsAsFactors = FALSE)
+  settings$error_sd = unname(error_sd[settings$error_level])
+  settings$n_true_regions = unname(n_regions[settings$complexity])
+  settings$name = stringr::str_c("error_", settings$error_level, ".complexity_", settings$complexity)
+
+  # ---- Simulate one data set -------------------------------------------------
+
+  simulateData = function(n_true_regions, sd, vectorFields){
+
+    traj_splits = seq(0, t_end, length.out = n_true_regions + 1)
+    true_traj = generateFullTrajectory(TimeSplits = traj_splits, numModels = n_models, sigma = sigma, k = k)
+
+    start_pos = stats::runif(n_dim, min = start_range[1], max = start_range[2])
+
+    true_data = RungeKutta(startTime = 0, startPos = start_pos, baseVectorFields = vectorFields,
+                           TrajList = true_traj, TrajTimeSplits = traj_splits, endTime = t_end, t_step = t_step)
+
+    sim_data = true_data
+    for(d in seq_len(n_dim)){
+      sim_data[, d + 1] = sim_data[, d + 1] + stats::rnorm(nrow(sim_data), mean = 0, sd = sd)
+    }
+
+    list(TrueTraj = list(Traj = true_traj, TimeSplits = traj_splits), TrueData = true_data, SimData = sim_data)
+
+  }
+
+  # ---- Fit FullFours-OneShot and compute its metrics -------------------------
+
+  runQuietly = function(expr){
+    if(quiet){
+      res = NULL
+      utils::capture.output(res <- expr)
+      res
+    } else{
+      expr
+    }
+  }
+
+  orNA = function(expr, default){
+    tryCatch(expr, error = function(e){default})
+  }
+
+  fitSetting = function(sim, theta, vectorFields){
+
+    SimData = sim$SimData
+    TrueData = sim$TrueData
+    TrueTraj = sim$TrueTraj
+
+    nsplits_path = if(is.null(path_nsplits)) floor(nrow(SimData)/4) else path_nsplits
+
+    EstPath = NULL
+    EstTraj = NULL
+    error = NA_character_
+    time_path = NA_real_
+    time_traj = NA_real_
+
+    tryCatch({
+
+      t0 = Sys.time()
+      EstPath = runQuietly(getEstimatedPaths_FullFours(SimData, nsplits = nsplits_path, V_Smooth = F,
+                                                       Model_Selection_Type = "BIC", patience = patience))
+      time_path = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+      t0 = Sys.time()
+      EstTraj = runQuietly(getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = traj_nsplits, baseVectorFields = vectorFields,
+                                                            V_Smooth = F, Model_Selection_Type = "BIC", patience = patience))
+      time_traj = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+    }, error = function(e){
+      error <<- conditionMessage(e)
+    })
+
+    dim_names = stringr::str_c("X", seq_len(n_dim))
+    traj_names = stringr::str_c("Trajectory", seq_len(n_models))
+    na_dims = stats::setNames(rep(NA_real_, n_dim), dim_names)
+    na_trajs = stats::setNames(rep(NA_real_, n_models), traj_names)
+
+    path_rmse = NA_real_
+    path_cov = path_width = na_dims
+    traj_dist = NA_real_
+    traj_cov = traj_width = na_trajs
+
+    if(!is.null(EstPath)){
+      est_pos = getEstPathPosition(TrueData$t, EstPath)
+      path_rmse = sqrt(mean(rowSums((as.matrix(TrueData[, -1]) - est_pos)^2)))
+
+      path_cov = orNA(stats::setNames(coverageRatePath(EstPath, SimData, CL = CL), dim_names), na_dims)
+      path_width = orNA(stats::setNames(avgCIWidthPath(EstPath, CL = CL, P_Int = TRUE, t_grid_size = t_step), dim_names), na_dims)
+    }
+
+    if(!is.null(EstTraj)){
+      traj_dist = orNA(cubicAvgSquareDist(EstTraj$Traj, TrueTraj$Traj, EstTraj$TimeSplits, TrueTraj$TimeSplits), NA_real_)
+
+      traj_cov = orNA(stats::setNames(coverageRateTraj(EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
+      traj_width = orNA(stats::setNames(avgCIWidthTraj(EstTraj, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
+    }
+
+    metrics = data.frame(
+      theta = theta,
+      path_regions = if(is.null(EstPath)) NA_integer_ else length(EstPath$Path),
+      traj_regions = if(is.null(EstTraj)) NA_integer_ else length(EstTraj$Traj),
+      path_rmse = path_rmse, traj_avg_sq_dist = traj_dist,
+      t(stats::setNames(path_cov, stringr::str_c("path_coverage_", dim_names))),
+      t(stats::setNames(traj_cov, stringr::str_c("traj_coverage_", traj_names))),
+      t(stats::setNames(path_width, stringr::str_c("path_width_", dim_names))),
+      t(stats::setNames(traj_width, stringr::str_c("traj_width_", traj_names))),
+      time_path = time_path, time_traj = time_traj, time_total = time_path + time_traj,
+      error = error, check.names = FALSE, stringsAsFactors = FALSE)
+
+    list(metrics = metrics, EstPath = EstPath, EstTraj = EstTraj)
+
+  }
+
+  # ---- Run the replicate -----------------------------------------------------
+
+  # Draw the replicate's angle, then simulate every data set, in a fixed order.
+  set.seed(seed)
+  theta = stats::runif(1, min = theta_range[1], max = theta_range[2])
+  vectorFields = makeVectorFields(theta)
+
+  sim_data = lapply(seq_len(nrow(settings)), function(i){
+    simulateData(n_true_regions = settings$n_true_regions[i], sd = settings$error_sd[i], vectorFields = vectorFields)
+  })
+  names(sim_data) = settings$name
+
+  results = list()
+  fits = list()
+
+  for(i in seq_len(nrow(settings))){
+
+    fit = fitSetting(sim_data[[i]], theta, vectorFields)
+
+    results[[i]] = data.frame(seed = seed, settings[i, c("error_level", "error_sd", "complexity", "n_true_regions")],
+                              fit$metrics, row.names = NULL, check.names = FALSE)
+
+    if(keep_fits){
+      fits[[settings$name[i]]] = list(EstPath = fit$EstPath, EstTraj = fit$EstTraj)
+    }
+  }
+
+  out = list(Seed = seed,
+             Settings = list(study = "Collinearity2D", error_sd = error_sd, n_regions = n_regions, theta_range = theta_range,
+                             method = "FullFours-OneShot", patience = patience, t_end = t_end, t_step = t_step,
+                             path_nsplits = path_nsplits, traj_nsplits = traj_nsplits, CL = CL,
+                             sigma = sigma, k = k, start_range = start_range),
+             Theta = theta,
+             VectorFields = vectorFields,
+             Results = do.call(rbind, results),
+             Data = sim_data)
+
+  if(keep_fits){
+    out$Fits = fits
+  }
+
+  out
+
+}
