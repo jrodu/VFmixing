@@ -98,8 +98,10 @@ runSimulationStudy_Axis2D = function(seed,
     matrix(c(0, 1,
              1, 0), nrow = 2)
   }
-  # A clean environment, so saving the returned function doesn't also save
-  # everything else inside this study.
+  # No source references and a clean environment, so saving the returned
+  # function doesn't also save the source file or everything else inside
+  # this study.
+  vectorFields = utils::removeSource(vectorFields)
   environment(vectorFields) = baseenv()
 
   n_dim = 2
