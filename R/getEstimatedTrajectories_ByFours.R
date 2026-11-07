@@ -62,10 +62,15 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   base_vel = t(apply(path_data[,1:(n_dim+1)], MARGIN = 1, FUN = flatVF, baseVectorFields = baseVectorFields, simplify = T))
   
-  not_0 = which(rowSums(base_vel == 0) == 0)
-  
   n_models = ncol(base_vel)/n_dim
-  
+
+  # Drop times where a base field is undefined (non-finite) or entirely zero.
+  # A single zero component is fine: e.g. the axis fields (0, 1) and (1, 0).
+  field_is_zero = sapply(seq_len(n_models), function(m){
+    rowSums(abs(base_vel[, (m - 1)*n_dim + seq_len(n_dim), drop = FALSE])) == 0
+  })
+  not_0 = which(rowSums(!is.finite(base_vel)) == 0 & rowSums(matrix(field_is_zero, ncol = n_models)) == 0)
+
   colnames(base_vel) = c(stringr::str_c("X", rep(1:n_dim, n_models),'v', 'M',rep(1:n_models, each = n_dim)))
   
   

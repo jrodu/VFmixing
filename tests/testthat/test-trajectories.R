@@ -27,3 +27,9 @@ test_that("ByFours trajectories support patience", {
   expect_error(getEstimatedTrajectories_ByFours(EstPath = ExEstPath_FullFours, nsplits = 40,
                                                 baseVectorFields = baseVectorFields, patience = 0), "patience")
 })
+
+test_that("ByFours trajectories accept fields with zero components", {
+  path = quietly(getEstimatedPaths_ByFours(ExData, 20))
+  expect_no_error(quietly(getEstimatedTrajectories_ByFours(EstPath = path, nsplits = 10,
+                                                           baseVectorFields = function(t, curPos){matrix(c(0, 1, 1, 0), 2)}, data_int = 0.01)))
+})
