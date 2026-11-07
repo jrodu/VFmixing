@@ -124,7 +124,7 @@ PathCovRate
 ```
 
 The coverage rates for `r paste(names(Data)[-1], collapse = " and ")` are
-`r paste0(round(100*PathCovRate, 1), "%", collapse = " and ")`, close to the
+`r paste0(round(100*PathCovRate, 1), "%", collapse = " and ")`, near the
 nominal 95%.
 
 This estimated path is also included in the package as `ExEstPath_FullFours`.

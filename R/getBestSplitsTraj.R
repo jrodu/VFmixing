@@ -187,3 +187,27 @@ trajSelectionCriterion = function(EstTrajList, EstPath, type, V_Smooth){
   criterion
   
 }
+
+# Tracks trajectory selection values as candidates are produced, so a search
+# can stop once `patience` candidates in a row have not improved on the best so
+# far. add() scores a new candidate and returns TRUE when the search should stop.
+trajPatienceTracker = function(patience, EstPath, type, V_Smooth){
+
+  values = c()
+
+  add = function(candidate){
+    values <<- c(values, trajSelectionCriterion(list(candidate), EstPath, type, V_Smooth))
+    !is.null(patience) && (length(values) - which.min(values)) >= patience
+  }
+
+  list(add = add, values = function(){values})
+}
+
+# Pick, report and return the best candidate trajectory from stored values.
+selectBestTraj = function(EstTrajList, values){
+
+  best_index = which.min(values)
+  reportBestRegions(length(EstTrajList[[best_index]]$Traj))
+  EstTrajList[[best_index]]
+
+}

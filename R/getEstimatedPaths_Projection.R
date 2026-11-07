@@ -166,11 +166,12 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
   
-  time_splits = c(min(Data$t),stats::median(Data$t),max(Data$t))
+  # Start from a single region and split from there
+  time_splits = range(Data$t)
   
   all_splits_est_path = list()
   
-  all_splits_est_path[[1]] = runEstPathStep_Projection(Data = Data, time_splits = time_splits, cur_unrestricted_coefs = list(), cur_unrestricted_cov = list(list()), cur_integral_list = list(), cur_sigma2_list = list(), worst_split = 1, V_Smooth = V_Smooth)
+  all_splits_est_path[[1]] = projectionSingleRegion(Data = Data, time_splits = time_splits)
 
   if(!is.null(patience)){
     tracker$add(all_splits_est_path[[1]])
@@ -213,3 +214,57 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
 
 
 
+
+# The Projection candidate with a single region. With no interior nodes there
+# are no constraints, so the projection leaves the unrestricted cubic unchanged:
+# the restricted fit, free parameters and covariances are those of the
+# unrestricted regression. The fields match runEstPathStep_Projection() so the
+# search can split from here.
+projectionSingleRegion = function(Data, time_splits){
+
+  n_dim = ncol(Data) - 1
+  h = time_splits[2] - time_splits[1]
+
+  split_labels = cut(x = Data$t, breaks = time_splits, include.lowest = T, right = T, labels = 1)
+  split_labels_unique = cut(x = unique(Data$t), breaks = time_splits, include.lowest = T, right = T, labels = 1)
+
+  coef = c()
+  unrestricted_cov = list()
+
+  for(i in 1:n_dim){
+
+    reg = runUnRestrictedCubicRegression_Path(cur_Data = Data, start_time = time_splits[1], dim = i)
+    coef = rbind(coef, reg[[1]])
+
+    X = reg[[3]]
+    qr_XtX = qr(t(X) %*% X)
+
+    if(qr_XtX$rank == 4){
+      XtX_inv = backsolve(qr.R(qr_XtX), x = diag(4)) %*% t(qr.Q(qr_XtX))
+    } else{
+      XtX_inv = pracma::pinv(t(X) %*% X)
+    }
+
+    unrestricted_cov[[i]] = reg[[2]] * XtX_inv
+
+  }
+
+  # Integral of the cubic basis products over the region (as in constructIntegralMatrixList_Path)
+  powers = outer(1:4, 1:4, function(i, j){9 - i - j})
+  integral_block = h^powers / powers
+
+  EstPath = list(coef)
+
+  est_pos = evaluatePathAt(Data$t, list(Path = EstPath, TimeSplits = time_splits))$pos
+
+  Error_mat = cbind(t = Data$t, (Data[,-1] - est_pos)^2)
+
+  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = 1,
+       PosSplits = unname(table(split_labels_unique) >= 8),
+       Cov = list(unrestricted_cov), FullCov = unrestricted_cov,
+       Sigma2 = list(unname(colMeans(Error_mat[,-1]))), SplitLabels = split_labels,
+       UnrestrictedCoef = list(coef), UnrestrictedCov = list(unrestricted_cov),
+       IntegralList = list(integral_block),
+       Free_Parameters = coef, Free_Parameter_Cov = unrestricted_cov)
+
+}

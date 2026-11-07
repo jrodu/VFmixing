@@ -27,11 +27,12 @@ test_that("patience gives the same path when the best model comes early", {
 })
 
 test_that("patience stops the node search early", {
-  # On ExData, BIC picks the very first candidate, so patience = 2 keeps 3 candidates.
+  # With patience = 2 the search keeps the best candidate plus the two after it.
   all = quietly(getEstimatedPaths_ByFours(ExData, 100, return_all = TRUE))
+  best = which.min(VFmixing:::pathSelectionValues(all, "BIC", V_Smooth = FALSE))
   early = quietly(getEstimatedPaths_ByFours(ExData, 100, return_all = TRUE, patience = 2))
-  expect_gt(length(all), 3)
-  expect_length(early, 3)
+  expect_gt(length(all), best + 2)
+  expect_length(early, best + 2)
 })
 
 test_that("patience works with the covariance-based criteria, including BICVel", {

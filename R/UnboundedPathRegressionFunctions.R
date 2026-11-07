@@ -12,7 +12,13 @@
 #' @export
 #'
 constructUnboundedCubicSplineModelMatrix_Path = function(Data, time_splits, split_labels, V_Smooth = F){
-  
+
+  if(length(time_splits) == 2){
+    # A single region: an ordinary cubic in (t - t_0).
+    s = Data$t - time_splits[1]
+    return(cbind(a1 = s^3, b1 = s^2, c1 = s, d1 = 1))
+  }
+
   if(V_Smooth){
     
     a1 = ((Data$t - time_splits[1])^3)*(split_labels == 1) +

@@ -95,7 +95,8 @@ getEstimatedPaths_FullRegression = function(Data, nsplits, V_Smooth = F, Model_S
   n_dim = ncol(Data) - 1
   names(Data) = c('t', stringr::str_c("X",1:n_dim))
   
-  time_splits = stats::fivenum(Data$t)
+  # Start from a single region and split from there
+  time_splits = range(Data$t)
   
   all_splits_est_path = list()
   

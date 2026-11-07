@@ -13,6 +13,9 @@
 #' If TRUE, the path must've been estimated using the FullRegression or Projection methods.
 #' @param Path_V_Smooth a boolean. TRUE if the path cubic spline was estimated under C2 smoothness. FALSE if C1. Only used if Random_Path = TRUE.
 #' If missing, it is detected from EstPath.
+#' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
+#' Otherwise, stop the node search after this many consecutive candidates that do not improve the BIC.
+#' This is faster, but it can miss a better model that only appears after a long run without improvement.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -23,7 +26,9 @@
 #'                                  data_int = 0.01, Random_Path = FALSE, 
 #'                                  Path_V_Smooth = FALSE)
 #'    
-getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVectorFields, data_int = 0.001, Random_Path = F, Path_V_Smooth){
+getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVectorFields, data_int = 0.001, Random_Path = F, Path_V_Smooth, patience = NULL){
+  
+  checkPatience(patience)
   
   n_dim = nrow(EstPath$Path[[1]])
   
@@ -360,9 +365,18 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   all_splits_est_traj[[4]] = list(Traj = est_traj, TimeSplits = time_splits, Error = Error_mat, n_splits = 4, PosSplits = pos_splits)
   
+  # The first four candidates are always built; score them for patience.
+  stop_early = FALSE
+  if(!is.null(patience)){
+    tracker = trajPatienceTracker(patience, EstPath, "BIC", V_Smooth = F)
+    for(cand in all_splits_est_traj){
+      stop_early = tracker$add(cand)
+    }
+  }
+  
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
-  while(length(time_splits)-1 <= nsplits){
+  while(!stop_early && length(time_splits)-1 <= nsplits){
     
     split_labels_path = cut(x = EstPath$Error$t, breaks = time_splits, include.lowest = T, right = T, labels = 1:(length(time_splits)-1))
     mean_path_error = unname(by(rowSums(EstPath$Error[,-1]), split_labels_path, stats::median))
@@ -791,12 +805,21 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
     
     svMisc::progress(length(est_traj)-1, max.value = nsplits, progress.bar = T, console = T)
     
+    if(!is.null(patience) && tracker$add(all_splits_est_traj[[length(all_splits_est_traj)]])){
+      break
+    }
+    
     if(sum(pos_splits) == 0){
       break
     }
     
   }
   
+  
+  if(!is.null(patience)){
+    # The candidates were already scored while searching.
+    return(selectBestTraj(all_splits_est_traj, tracker$values()))
+  }
   
   getBestSplitsTraj(all_splits_est_traj, EstPath = EstPath, show = F, type = "BIC", V_Smooth = F)
   

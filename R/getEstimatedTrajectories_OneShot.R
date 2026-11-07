@@ -159,9 +159,10 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
     trajSelectionCriterion(list(cand), EstPath, Model_Selection_Type, V_Smooth)
   }
 
-  time_splits = c(min(EstPath$TimeSplits), mean(c(min(EstPath$TimeSplits), max(EstPath$TimeSplits))), max(EstPath$TimeSplits))
+  # Start from a single region and split from there
+  time_splits = range(EstPath$TimeSplits)
 
-  caches = list(newRegion(time_splits[1], time_splits[2]), newRegion(time_splits[2], time_splits[3]))
+  caches = list(newRegion(time_splits[1], time_splits[2]))
 
   all_splits_est_traj = list()
 

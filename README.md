@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x000002c83a74c620>
+#> <bytecode: 0x00000225cc77f078>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -98,7 +98,7 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.30    0.02    0.31
+#>    0.27    0.03    0.30
 ```
 
 Because the “FullFours” path has a covariance structure, the plot can
@@ -132,11 +132,11 @@ inside them.
 ``` r
 PathCovRate = coverageRatePath(EstPath = EstPath, Data = Data, CL = 0.95)
 PathCovRate
-#> [1] 0.9441118 0.9620758
+#> [1] 0.9481038 0.9600798
 ```
 
-The coverage rates for X1 and X2 are 94.4% and 96.2%, close to the
-nominal 95%.
+The coverage rates for X1 and X2 are 94.8% and 96%, near the nominal
+95%.
 
 This estimated path is also included in the package as
 `ExEstPath_FullFours`.
@@ -186,7 +186,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>    5.50    0.16    5.75
+#>    4.32    0.80    5.83
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -207,7 +207,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.03    0.00    0.04
+#>    0.02    0.01    0.03
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
@@ -238,15 +238,17 @@ AvgSqDist = cubicAvgSquareDist(EstCubic = EstTraj$Traj,
                                lower_bound = min(EstTraj$TimeSplits),
                                upper_bound = max(EstTraj$TimeSplits))
 AvgSqDist
-#> [1] 0.0002546923
+#> [1] 0.0002919432
 
 TrajCovRate = coverageRateTraj(EstTraj = EstTraj, TrueTraj = TrueTraj$Traj,
                                TrueTrajTimeSplits = TrueTraj$TimeSplits,
                                CL = 0.95)
 TrajCovRate
-#> [1] 1 1
+#> [1] 0.7764471 0.8982036
 ```
 
 The average squared distance is extremely small, and the coverage rates
-for the two trajectories are 100% and 100%, at or above the nominal 95%.
-For this example the intervals are, if anything, conservative.
+for the two trajectories are 77.6% and 89.8%, with at least one below
+the nominal 95%. This suggests the assumption that the mixing vector
+fields are constant within the error region of a data point is not fully
+met for this data.
