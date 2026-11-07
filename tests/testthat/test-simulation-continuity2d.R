@@ -1,9 +1,9 @@
 skip_if_not_installed("akima")
 
 # A small, quick version of the study
-small_run = function(seed, continuity = c("discontinuous", "continuous", "differentiable"), ...){
+small_run = function(seed, progress = FALSE, continuity = c("discontinuous", "continuous", "differentiable"), ...){
   runSimulationStudy_Continuity2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
-                                  traj_nsplits = 20, continuity = continuity, ...)
+                                  traj_nsplits = 20, continuity = continuity, progress = progress, ...)
 }
 
 test_that("the study draws two grids and builds a field for each continuity", {
@@ -77,4 +77,13 @@ test_that("the study checks its arguments", {
   expect_error(runSimulationStudy_Continuity2D(1, continuity = "smooth"), "continuity")
   expect_error(runSimulationStudy_Continuity2D(1, start_range = c(-20, 20)), "start_range")
   expect_error(runSimulationStudy_Continuity2D(1, patience = 0), "patience")
+})
+
+test_that("progress is printed as the replicate runs", {
+  msgs = testthat::capture_messages(small_run(1, continuity = "continuous", keep_fits = FALSE, progress = TRUE))
+  expect_true(any(grepl("^[[]seed 1 [0-9:]{8}[]] simulating data set 1/1: ", msgs)))
+  expect_true(any(grepl("fit 1/1: ", msgs)))
+  expect_true(any(grepl("done in [0-9.]+ min", msgs)))
+
+  expect_length(testthat::capture_messages(small_run(1, continuity = "continuous", keep_fits = FALSE)), 0)
 })

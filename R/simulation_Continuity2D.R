@@ -77,6 +77,8 @@
 #' @param max_attempts a positive integer. The most draws allowed for a path that stays inside the grid.
 #' @param keep_fits a boolean. If TRUE, the fitted paths and trajectories are returned as well.
 #' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
+#' @param progress a boolean. If TRUE, a time-stamped message is printed as each data set is
+#' simulated and each fit finishes, and the total time at the end.
 #'
 #' @returns a list with:
 #' * `Seed`: the seed.
@@ -112,7 +114,7 @@ runSimulationStudy_Continuity2D = function(seed,
                                            patience = 10, t_end = 20, t_step = 0.01,
                                            path_nsplits = NULL, traj_nsplits = 100, CL = 0.95,
                                            sigma = 0.5, k = 0.5, start_range = c(-5, 5), max_attempts = 100,
-                                           keep_fits = TRUE, quiet = TRUE){
+                                           keep_fits = TRUE, quiet = TRUE, progress = TRUE){
 
   n_dim = 2
   n_models = 2
@@ -399,6 +401,14 @@ runSimulationStudy_Continuity2D = function(seed,
 
   # ---- Run the replicate -----------------------------------------------------
 
+  # Progress messages (to stderr, so `quiet` doesn't hide them)
+  say = function(...){
+    if(progress){
+      message("[seed ", seed, " ", format(Sys.time(), "%H:%M:%S"), "] ", ...)
+    }
+  }
+  run_start = Sys.time()
+
   # Draw the replicate's grids, then simulate every data set, in a fixed order.
   set.seed(seed)
   grid_1 = createRandomGrid()
@@ -407,6 +417,7 @@ runSimulationStudy_Continuity2D = function(seed,
   vector_fields = lapply(stats::setNames(continuity, continuity), makeVectorFields, grid_1 = grid_1, grid_2 = grid_2)
 
   sim_data = lapply(seq_len(nrow(settings)), function(i){
+    say("simulating data set ", i, "/", nrow(settings), ": ", settings$name[i])
     simulateData(n_true_regions = settings$n_true_regions[i], sd = settings$error_sd[i],
                  vectorFields = vector_fields[[settings$continuity[i]]])
   })
@@ -418,6 +429,9 @@ runSimulationStudy_Continuity2D = function(seed,
   for(i in seq_len(nrow(settings))){
 
     fit = fitSetting(sim_data[[i]], vector_fields[[settings$continuity[i]]])
+    say("fit ", i, "/", nrow(settings), ": ", settings$name[i],
+        sprintf(" (%.1f s)", fit$metrics$time_total),
+        if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))
 
     results[[i]] = data.frame(seed = seed, settings[i, c("error_level", "error_sd", "complexity", "n_true_regions", "continuity")],
                               fit$metrics, row.names = NULL, check.names = FALSE)
@@ -429,6 +443,8 @@ runSimulationStudy_Continuity2D = function(seed,
 
   # Attempts are reported in Results, not kept in Data
   sim_data = lapply(sim_data, function(s){s$Attempts = NULL; s})
+
+  say("done in ", sprintf("%.1f", as.numeric(difftime(Sys.time(), run_start, units = "mins"))), " min")
 
   out = list(Seed = seed,
              Settings = list(study = "Continuity2D", error_sd = error_sd, n_regions = n_regions, continuity = continuity,

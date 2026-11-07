@@ -1,7 +1,7 @@
 # A small, quick version of the study
-small_run = function(seed, methods = c("ByFours-ByFours", "FullRegression-OneShot", "FullFours-OneShot", "Projection-OneShot"), ...){
+small_run = function(seed, progress = FALSE, methods = c("ByFours-ByFours", "FullRegression-OneShot", "FullFours-OneShot", "Projection-OneShot"), ...){
   runSimulationStudy_Misspecification2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
-                                        traj_nsplits = 20, methods = methods, ...)
+                                        traj_nsplits = 20, methods = methods, progress = progress, ...)
 }
 
 test_that("the study returns its true and misspecified vector fields", {
@@ -54,3 +54,12 @@ test_that("the study checks its arguments", {
   expect_error(runSimulationStudy_Misspecification2D(1, patience = 0), "patience")
 })
 
+
+test_that("progress is printed as the replicate runs", {
+  msgs = testthat::capture_messages(small_run(1, methods = "FullFours-OneShot", keep_fits = FALSE, progress = TRUE))
+  expect_true(any(grepl("^[[]seed 1 [0-9:]{8}[]] simulating data set 1/1: ", msgs)))
+  expect_true(any(grepl("fit 1/1: ", msgs)))
+  expect_true(any(grepl("done in [0-9.]+ min", msgs)))
+
+  expect_length(testthat::capture_messages(small_run(1, methods = "FullFours-OneShot", keep_fits = FALSE)), 0)
+})

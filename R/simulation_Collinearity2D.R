@@ -63,6 +63,8 @@
 #' @param start_range a numeric vector of length 2. The range of the uniform start position.
 #' @param keep_fits a boolean. If TRUE, the fitted paths and trajectories are returned as well.
 #' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
+#' @param progress a boolean. If TRUE, a time-stamped message is printed as each data set is
+#' simulated and each fit finishes, and the total time at the end.
 #'
 #' @returns a list with:
 #' * `Seed`: the seed.
@@ -95,7 +97,7 @@ runSimulationStudy_Collinearity2D = function(seed,
                                              patience = 10, t_end = 20, t_step = 0.01,
                                              path_nsplits = NULL, traj_nsplits = 100, CL = 0.95,
                                              sigma = 0.5, k = 0.5, start_range = c(-100, 100),
-                                             keep_fits = TRUE, quiet = TRUE){
+                                             keep_fits = TRUE, quiet = TRUE, progress = TRUE){
 
   # ---- The vector fields: the x-axis and a unit vector at angle theta -------
 
@@ -258,12 +260,21 @@ runSimulationStudy_Collinearity2D = function(seed,
 
   # ---- Run the replicate -----------------------------------------------------
 
+  # Progress messages (to stderr, so `quiet` doesn't hide them)
+  say = function(...){
+    if(progress){
+      message("[seed ", seed, " ", format(Sys.time(), "%H:%M:%S"), "] ", ...)
+    }
+  }
+  run_start = Sys.time()
+
   # Draw the replicate's angle, then simulate every data set, in a fixed order.
   set.seed(seed)
   theta = stats::runif(1, min = theta_range[1], max = theta_range[2])
   vectorFields = makeVectorFields(theta)
 
   sim_data = lapply(seq_len(nrow(settings)), function(i){
+    say("simulating data set ", i, "/", nrow(settings), ": ", settings$name[i])
     simulateData(n_true_regions = settings$n_true_regions[i], sd = settings$error_sd[i], vectorFields = vectorFields)
   })
   names(sim_data) = settings$name
@@ -274,6 +285,9 @@ runSimulationStudy_Collinearity2D = function(seed,
   for(i in seq_len(nrow(settings))){
 
     fit = fitSetting(sim_data[[i]], theta, vectorFields)
+    say("fit ", i, "/", nrow(settings), ": ", settings$name[i],
+        sprintf(" (%.1f s)", fit$metrics$time_total),
+        if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))
 
     results[[i]] = data.frame(seed = seed, settings[i, c("error_level", "error_sd", "complexity", "n_true_regions")],
                               fit$metrics, row.names = NULL, check.names = FALSE)
@@ -282,6 +296,8 @@ runSimulationStudy_Collinearity2D = function(seed,
       fits[[settings$name[i]]] = list(EstPath = fit$EstPath, EstTraj = fit$EstTraj)
     }
   }
+
+  say("done in ", sprintf("%.1f", as.numeric(difftime(Sys.time(), run_start, units = "mins"))), " min")
 
   out = list(Seed = seed,
              Settings = list(study = "Collinearity2D", error_sd = error_sd, n_regions = n_regions, theta_range = theta_range,
