@@ -143,3 +143,17 @@ psdSolve = function(A, B){
   }
   pracma::pinv(A) %*% B
 }
+
+# blockdiag(blocks) %*% M without forming the block-diagonal matrix.
+blockDiagTimes = function(blocks, M){
+  n = vapply(blocks, nrow, integer(1))
+  off = c(0, cumsum(n))
+  do.call(rbind, lapply(seq_along(blocks), function(i){blocks[[i]] %*% M[off[i] + seq_len(n[i]), , drop = FALSE]}))
+}
+
+# M %*% blockdiag(blocks) without forming the block-diagonal matrix.
+timesBlockDiag = function(M, blocks){
+  n = vapply(blocks, nrow, integer(1))
+  off = c(0, cumsum(n))
+  do.call(cbind, lapply(seq_along(blocks), function(i){M[, off[i] + seq_len(n[i]), drop = FALSE] %*% blocks[[i]]}))
+}
