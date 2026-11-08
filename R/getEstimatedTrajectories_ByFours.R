@@ -16,6 +16,9 @@
 #' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
 #' Otherwise, stop the node search after this many consecutive candidates that do not improve the BIC.
 #' This is faster, but it can miss a better model that only appears after a long run without improvement.
+#' @param undersmooth a boolean. If TRUE (the default), return the candidate with twice as many regions as the one
+#' the BIC selects (the first with at least that many, or the last if the search ends first). With `patience`,
+#' the BIC's choice is fixed when patience runs out and the search continues until it reaches twice that many regions.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -26,7 +29,7 @@
 #'                                  data_int = 0.01, Random_Path = FALSE, 
 #'                                  Path_V_Smooth = FALSE)
 #'    
-getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVectorFields, data_int = 0.001, Random_Path = F, Path_V_Smooth, patience = NULL){
+getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVectorFields, data_int = 0.001, Random_Path = F, Path_V_Smooth, patience = NULL, undersmooth = T){
   
   checkPatience(patience)
   
@@ -373,7 +376,7 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   # The first four candidates are always built; score them for patience.
   stop_early = FALSE
   if(!is.null(patience)){
-    tracker = trajPatienceTracker(patience, EstPath, "BIC", V_Smooth = F)
+    tracker = trajPatienceTracker(patience, EstPath, "BIC", V_Smooth = F, undersmooth = undersmooth)
     for(cand in all_splits_est_traj){
       stop_early = tracker$add(cand)
     }
@@ -823,9 +826,9 @@ getEstimatedTrajectories_ByFours = function(EstPath, EstVel, nsplits, baseVector
   
   if(!is.null(patience)){
     # The candidates were already scored while searching.
-    return(selectBestTraj(all_splits_est_traj, tracker$values()))
+    return(selectBestTraj(all_splits_est_traj, tracker$values(), undersmooth = undersmooth, best_index = tracker$best_index()))
   }
   
-  getBestSplitsTraj(all_splits_est_traj, EstPath = EstPath, show = F, type = "BIC", V_Smooth = F)
+  getBestSplitsTraj(all_splits_est_traj, EstPath = EstPath, show = F, type = "BIC", V_Smooth = F, undersmooth = undersmooth)
   
 }

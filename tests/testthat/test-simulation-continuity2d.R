@@ -1,9 +1,9 @@
 skip_if_not_installed("akima")
 
 # A small, quick version of the study
-small_run = function(seed, progress = FALSE, continuity = c("discontinuous", "continuous", "differentiable"), ...){
+small_run = function(seed, progress = FALSE, continuity = c("discontinuous", "continuous", "differentiable"), B = 3, ...){
   runSimulationStudy_Continuity2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
-                                  traj_nsplits = 20, continuity = continuity, progress = progress, ...)
+                                  traj_nsplits = 20, continuity = continuity, B = B, progress = progress, ...)
 }
 
 test_that("the study draws two grids and builds a field for each continuity", {
@@ -50,7 +50,7 @@ test_that("one replicate runs every continuity and records every metric", {
   expect_equal(r$continuity, c("discontinuous", "continuous", "differentiable"))
   expect_true(all(is.na(r$error)))
   expect_true(all(c("path_attempts", "path_rmse", "traj_avg_sq_dist", "path_coverage_X1", "traj_coverage_Trajectory2",
-                    "path_width_X2", "traj_width_Trajectory1", "time_path", "time_traj", "time_total") %in% names(r)))
+                    "path_width_X2", "traj_width_Trajectory1", "variant", "time_total", "selection_share", "traj_coverage_within_Trajectory1") %in% names(r)))
   expect_true(all(r$path_attempts >= 1 & r$path_rmse > 0))
 
   # every true path stays on the grid

@@ -4,7 +4,15 @@
 \alias{getBestSplitsTraj}
 \title{getBestSplitsTraj}
 \usage{
-getBestSplitsTraj(EstTrajList, EstPath, show = F, type = "BIC", V_Smooth = T)
+getBestSplitsTraj(
+  EstTrajList,
+  EstPath,
+  show = F,
+  type = "BIC",
+  V_Smooth = T,
+  undersmooth = F,
+  best_index = NULL
+)
 }
 \arguments{
 \item{EstTrajList}{a list of EstimatedTraj objects.
@@ -22,6 +30,12 @@ VarPos needs a covariance structure, so it can only be used with OneShot.
 "BICPos" is no longer available: it needed a velocity covariance matrix that no trajectory method produces.}
 
 \item{V_Smooth}{a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.}
+
+\item{undersmooth}{a boolean. If TRUE, return the first candidate with at least twice as many regions
+as the one the criterion selects (or the last candidate, if none has that many), instead of the selected one.}
+
+\item{best_index}{NULL or an integer. The index of the candidate the criterion selected, if already known
+(for example from a search that stopped early). If NULL, it is found from the criterion.}
 }
 \value{
 an EstimatedTraj object.

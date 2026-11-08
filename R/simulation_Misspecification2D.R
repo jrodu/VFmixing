@@ -9,7 +9,7 @@
 #' fields \eqn{(3y, -4x)/\|(3y, 4x)\|} and \eqn{(4x, 3y)/\|(4x, 3y)\|}. All
 #' are undefined at the origin itself. For every combination of positional
 #' error level and true trajectory complexity it simulates a data set and fits
-#' each path and trajectory method pair, recording accuracy, coverage, interval
+#' each variant of the method, recording accuracy, coverage, interval
 #' width and run time. Run it with seeds 1, 2, ..., N to reproduce the full
 #' study.
 #'
@@ -25,16 +25,22 @@
 #' `t_step`. The observed data add independent normal noise with the error
 #' level's standard deviation to each position. All data sets are simulated
 #' (in a fixed order) before any fitting, so the data for a seed do not depend
-#' on which methods are run.
+#' on which variants are run.
 #'
-#' **Methods.** Each entry of `methods` is `"<path method>-<trajectory method>"`.
-#' Path methods: `ByFours`, `FullRegression`, `FullFours`, `Projection`.
-#' Trajectory methods: `ByFours`, `OneShot`. Selection uses BIC with C1
-#' smoothness, and `patience` is passed to every search. The trajectories are
-#' fitted with the misspecified fields, and their estimates are compared with
-#' the true trajectories.
+#' **Variants.** Every variant fits a FullFours path and OneShot trajectories
+#' with BIC selection, C1 smoothness and `patience`. Each entry of `variants`
+#' is one of:
+#' * `"BIC"`: the regions BIC selects, for both the path and the trajectories.
+#' * `"2x BIC path only"`: twice BIC's path regions, BIC's trajectory regions.
+#' * `"2x BIC"`: twice BIC's regions for both (the default undersmoothing).
+#' * `"2x BIC + bootstrap"`: `"2x BIC"`, with the node-selection variance from
+#'   `B` bootstrap replicates added to OneShot's covariance, through the law of
+#'   total variance ([getEstimatedTrajectories_Full()]).
 #'
-#' **Metrics.** For each setting and method pair:
+#' The trajectories are fitted with the misspecified fields, and their
+#' estimates are compared with the true trajectories.
+#'
+#' **Metrics.** For each setting and variant:
 #' * `path_rmse`: root mean squared distance between the estimated and true
 #'   positions at the data times.
 #' * `traj_avg_sq_dist`: [cubicAvgSquareDist()] between the estimated and true
@@ -45,16 +51,19 @@
 #'   confidence intervals, per trajectory.
 #' * `path_width_*`: [avgCIWidthPath()] with prediction intervals, per dimension.
 #' * `traj_width_*`: [avgCIWidthTraj()], per trajectory.
-#' * `time_path`, `time_traj`, `time_total`: elapsed seconds.
+#' * `traj_coverage_within_*`, `traj_width_within_*`: for `"2x BIC + bootstrap"`,
+#'   the same with OneShot's covariance alone (without the selection part).
+#' * `selection_share`: for `"2x BIC + bootstrap"`, the average share of the
+#'   trajectory variance that comes from the node selection.
+#' * `time_total`: elapsed seconds for the fit (including the bootstrap).
 #'
-#' Coverage and width need a covariance structure, so they are `NA` for
-#' ByFours paths and trajectories. If a method fails, its metrics are `NA` and
-#' the error message is recorded.
+#' If a fit fails, its metrics are `NA` and the error message is recorded.
 #'
 #' @param seed an integer. The random seed for this replicate.
 #' @param error_sd a named numeric vector. The positional error standard deviations, named by level.
 #' @param n_regions a named numeric vector. The number of regions in the true trajectories, named by complexity level.
-#' @param methods a character vector of method pairs. See Details.
+#' @param variants a character vector of variants. See Details.
+#' @param B a whole number of at least 2. The number of bootstrap replicates for `"2x BIC + bootstrap"`.
 #' @param patience NULL or a positive integer. Passed to every path and trajectory search.
 #' @param t_end a positive number. The end time of the simulation (it starts at 0).
 #' @param t_step a positive number. The time step of the data and of the Runge-Kutta solution.
@@ -75,30 +84,29 @@
 #' * `VectorFields`: the true base vector fields function, used to generate the data.
 #' * `FitVectorFields`: the misspecified base vector fields function, used to fit
 #'   the trajectories, e.g. for [visualizeEstTraj()].
-#' * `Results`: a data frame with one row per setting and method pair, holding the metrics.
+#' * `Results`: a data frame with one row per setting and variant, holding the metrics.
 #' * `Data`: for each setting, the true trajectory (`TrueTraj`), true path (`TrueData`) and observed data (`SimData`).
-#' * `Fits`: if `keep_fits`, the estimated path and trajectory for each setting and method pair.
+#' * `Fits`: if `keep_fits`, the estimated path, trajectory and (with the bootstrap) variance pieces for each setting and variant.
 #' @export
 #'
 #' @examples
 #' \donttest{
 #' # One replicate with a single, quick setting
 #' run = runSimulationStudy_Misspecification2D(seed = 1, error_sd = c(med = 0.01),
-#'                                 n_regions = c(low = 2), t_end = 5,
-#'                                 methods = "FullFours-OneShot")
+#'                                 n_regions = c(low = 2), t_end = 5, variants = "2x BIC")
 #' run$Results
 #'
 #' # The full study: one replicate per seed
-#' # runs = lapply(1:1000, function(s){
+#' # runs = lapply(1:100, function(s){
 #' #   runSimulationStudy_Misspecification2D(seed = s, keep_fits = FALSE)
 #' # })
 #' # results = do.call(rbind, lapply(runs, `[[`, "Results"))
 #' }
 #'
 runSimulationStudy_Misspecification2D = function(seed,
-                                                 error_sd = c(low = 0.001, med = 0.01, high = 0.1),
-                                                 n_regions = c(low = 2, med = 10, high = 50),
-                                                 methods = c("ByFours-ByFours", "FullRegression-OneShot", "FullFours-OneShot", "Projection-OneShot"),
+                                                 error_sd = c(low = 0.001),
+                                                 n_regions = c(med = 10),
+                                                 variants = "2x BIC + bootstrap", B = 20,
                                                  patience = 10, t_end = 20, t_step = 0.01,
                                                  path_nsplits = NULL, traj_nsplits = 100, CL = 0.95,
                                                  sigma = 0.5, k = 0.5, start_range = c(-100, 100),
@@ -149,18 +157,12 @@ runSimulationStudy_Misspecification2D = function(seed,
     stop("n_regions must be a named vector of positive whole numbers.", call. = FALSE)
   }
 
-  method_pieces = strsplit(methods, "-", fixed = TRUE)
-  known = vapply(method_pieces, function(p){
-    length(p) == 2 && p[1] %in% c("ByFours", "FullRegression", "FullFours", "Projection") && p[2] %in% c("ByFours", "OneShot")
-  }, logical(1))
-
-  if(!all(known)){
-    stop("Unknown method pair(s): ", paste(methods[!known], collapse = ", "),
-         ". Use \"<ByFours|FullRegression|FullFours|Projection>-<ByFours|OneShot>\".", call. = FALSE)
+  if(length(variants) < 1 || anyDuplicated(variants) || !all(variants %in% c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"))){
+    stop("variants must be distinct values from \"BIC\", \"2x BIC path only\", \"2x BIC\" and \"2x BIC + bootstrap\".", call. = FALSE)
   }
 
-  if(any(vapply(method_pieces, function(p){p[1] == "ByFours" && p[2] == "OneShot"}, logical(1)))){
-    stop("OneShot trajectories need a path with a covariance structure, so they can't follow ByFours.", call. = FALSE)
+  if("2x BIC + bootstrap" %in% variants && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
+    stop("B must be a whole number of at least 2.", call. = FALSE)
   }
 
   if(!is.null(patience) && (length(patience) != 1 || !is.numeric(patience) || patience < 1 || patience != round(patience))){
@@ -195,7 +197,7 @@ runSimulationStudy_Misspecification2D = function(seed,
 
   }
 
-  # ---- Fit one method pair and compute its metrics ---------------------------
+  # ---- Fit one variant and compute its metrics -------------------------------
 
   runQuietly = function(expr){
     if(quiet){
@@ -211,11 +213,15 @@ runSimulationStudy_Misspecification2D = function(seed,
     tryCatch(expr, error = function(e){default})
   }
 
-  fitMethodPair = function(method, sim){
-
-    pieces = strsplit(method, "-", fixed = TRUE)[[1]]
-    path_method = pieces[1]
-    traj_method = pieces[2]
+  # Every variant fits a FullFours path and OneShot trajectories with BIC
+  # selection and C1 smoothness. They differ in the number of regions and in
+  # the trajectory covariance:
+  # * "BIC": the regions BIC selects, for the path and the trajectories.
+  # * "2x BIC path only": twice BIC's path regions, BIC's trajectory regions.
+  # * "2x BIC": twice BIC's regions for both.
+  # * "2x BIC + bootstrap": "2x BIC", with the node-selection variance added to
+  #   OneShot's covariance (getEstimatedTrajectories_Full()).
+  fitVariant = function(variant, sim, fitFields, extra = list()){
 
     SimData = sim$SimData
     TrueData = sim$TrueData
@@ -225,27 +231,29 @@ runSimulationStudy_Misspecification2D = function(seed,
 
     EstPath = NULL
     EstTraj = NULL
+    Variance = NULL
     error = NA_character_
-    time_path = NA_real_
-    time_traj = NA_real_
+    time_total = NA_real_
 
     tryCatch({
 
       t0 = Sys.time()
-      EstPath = runQuietly(switch(path_method,
-        ByFours = getEstimatedPaths_ByFours(SimData, nsplits = nsplits_path, Model_Selection_Type = "BIC", patience = patience),
-        FullRegression = getEstimatedPaths_FullRegression(SimData, nsplits = nsplits_path, V_Smooth = F, Model_Selection_Type = "BIC", patience = patience),
-        FullFours = getEstimatedPaths_FullFours(SimData, nsplits = nsplits_path, V_Smooth = F, Model_Selection_Type = "BIC", patience = patience),
-        Projection = getEstimatedPaths_Projection(SimData, nsplits = nsplits_path, V_Smooth = F, Model_Selection_Type = "BIC", patience = patience)))
-      time_path = as.numeric(difftime(Sys.time(), t0, units = "secs"))
 
-      t0 = Sys.time()
-      EstTraj = runQuietly(switch(traj_method,
-        ByFours = getEstimatedTrajectories_ByFours(EstPath = EstPath, nsplits = traj_nsplits, baseVectorFields = fitVectorFields,
-                                                   data_int = t_step, patience = patience),
-        OneShot = getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = traj_nsplits, baseVectorFields = fitVectorFields,
-                                                   V_Smooth = F, Model_Selection_Type = "BIC", patience = patience)))
-      time_traj = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+      if(variant == "2x BIC + bootstrap"){
+        fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
+                                                       patience = patience, undersmooth = TRUE, bootstrap = TRUE, B = B, quiet = TRUE))
+        EstPath = fit$EstPath
+        EstTraj = fit$EstTraj
+        Variance = fit$Variance
+      } else{
+        EstPath = runQuietly(getEstimatedPaths_FullFours(SimData, nsplits = nsplits_path, V_Smooth = F, Model_Selection_Type = "BIC",
+                                                         patience = patience, undersmooth = variant != "BIC"))
+        EstTraj = runQuietly(getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = traj_nsplits, baseVectorFields = fitFields,
+                                                              V_Smooth = F, Model_Selection_Type = "BIC", patience = patience,
+                                                              undersmooth = variant == "2x BIC"))
+      }
+
+      time_total = as.numeric(difftime(Sys.time(), t0, units = "secs"))
 
     }, error = function(e){
       error <<- conditionMessage(e)
@@ -260,28 +268,36 @@ runSimulationStudy_Misspecification2D = function(seed,
     path_cov = path_width = na_dims
     traj_dist = NA_real_
     traj_cov = traj_width = na_trajs
+    traj_cov_within = traj_width_within = na_trajs
+    selection_share = NA_real_
 
     if(!is.null(EstPath)){
       est_pos = getEstPathPosition(TrueData$t, EstPath)
       path_rmse = sqrt(mean(rowSums((as.matrix(TrueData[, -1]) - est_pos)^2)))
 
-      if(!is.null(EstPath$Cov)){
-        path_cov = orNA(stats::setNames(coverageRatePath(EstPath, SimData, CL = CL), dim_names), na_dims)
-        path_width = orNA(stats::setNames(avgCIWidthPath(EstPath, CL = CL, P_Int = TRUE, t_grid_size = t_step), dim_names), na_dims)
-      }
+      path_cov = orNA(stats::setNames(coverageRatePath(EstPath, SimData, CL = CL), dim_names), na_dims)
+      path_width = orNA(stats::setNames(avgCIWidthPath(EstPath, CL = CL, P_Int = TRUE, t_grid_size = t_step), dim_names), na_dims)
     }
 
     if(!is.null(EstTraj)){
       traj_dist = orNA(cubicAvgSquareDist(EstTraj$Traj, TrueTraj$Traj, EstTraj$TimeSplits, TrueTraj$TimeSplits), NA_real_)
 
-      if(!is.null(EstTraj$Cov)){
-        traj_cov = orNA(stats::setNames(coverageRateTraj(EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
-        traj_width = orNA(stats::setNames(avgCIWidthTraj(EstTraj, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
+      # With the bootstrap, EstTraj$Cov is the total (within + selection) covariance
+      traj_cov = orNA(stats::setNames(coverageRateTraj(EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
+      traj_width = orNA(stats::setNames(avgCIWidthTraj(EstTraj, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
+
+      if(!is.null(Variance)){
+        # The same fit with OneShot's (within-node) covariance alone
+        EstTraj_within = EstTraj
+        EstTraj_within$Cov = Variance$Within
+        traj_cov_within = orNA(stats::setNames(coverageRateTraj(EstTraj_within, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
+        traj_width_within = orNA(stats::setNames(avgCIWidthTraj(EstTraj_within, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
+        selection_share = mean(Variance$Pointwise$selection_share)
       }
     }
 
     metrics = data.frame(
-      method = method, path_method = path_method, traj_method = traj_method,
+      variant = variant,
       path_regions = if(is.null(EstPath)) NA_integer_ else length(EstPath$Path),
       traj_regions = if(is.null(EstTraj)) NA_integer_ else length(EstTraj$Traj),
       path_rmse = path_rmse, traj_avg_sq_dist = traj_dist,
@@ -289,10 +305,17 @@ runSimulationStudy_Misspecification2D = function(seed,
       t(stats::setNames(traj_cov, stringr::str_c("traj_coverage_", traj_names))),
       t(stats::setNames(path_width, stringr::str_c("path_width_", dim_names))),
       t(stats::setNames(traj_width, stringr::str_c("traj_width_", traj_names))),
-      time_path = time_path, time_traj = time_traj, time_total = time_path + time_traj,
+      t(stats::setNames(traj_cov_within, stringr::str_c("traj_coverage_within_", traj_names))),
+      t(stats::setNames(traj_width_within, stringr::str_c("traj_width_within_", traj_names))),
+      selection_share = selection_share,
+      time_total = time_total,
       error = error, check.names = FALSE, stringsAsFactors = FALSE)
 
-    list(metrics = metrics, EstPath = EstPath, EstTraj = EstTraj)
+    if(length(extra) > 0){
+      metrics = data.frame(extra, metrics, check.names = FALSE, stringsAsFactors = FALSE)
+    }
+
+    list(metrics = metrics, EstPath = EstPath, EstTraj = EstTraj, Variance = Variance)
 
   }
 
@@ -306,7 +329,7 @@ runSimulationStudy_Misspecification2D = function(seed,
   }
   run_start = Sys.time()
 
-  # Simulate every data set first so the data for a seed never depend on the methods.
+  # Simulate every data set first so the data for a seed never depend on the variants.
   set.seed(seed)
   sim_data = lapply(seq_len(nrow(settings)), function(i){
     say("simulating data set ", i, "/", nrow(settings), ": ", settings$name[i])
@@ -321,10 +344,10 @@ runSimulationStudy_Misspecification2D = function(seed,
 
     fits[[settings$name[i]]] = list()
 
-    for(method in methods){
+    for(variant in variants){
 
-      fit = fitMethodPair(method, sim_data[[i]])
-      say("fit ", length(results) + 1, "/", nrow(settings)*length(methods), ": ", settings$name[i], ", ", method,
+      fit = fitVariant(variant, sim_data[[i]], fitVectorFields)
+      say("fit ", length(results) + 1, "/", nrow(settings)*length(variants), ": ", settings$name[i], ", ", variant,
           sprintf(" (%.1f s)", fit$metrics$time_total),
           if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))
 
@@ -332,7 +355,7 @@ runSimulationStudy_Misspecification2D = function(seed,
                                                   fit$metrics, row.names = NULL, check.names = FALSE)
 
       if(keep_fits){
-        fits[[settings$name[i]]][[method]] = list(EstPath = fit$EstPath, EstTraj = fit$EstTraj)
+        fits[[settings$name[i]]][[variant]] = list(EstPath = fit$EstPath, EstTraj = fit$EstTraj, Variance = fit$Variance)
       }
     }
   }
@@ -340,7 +363,7 @@ runSimulationStudy_Misspecification2D = function(seed,
   say("done in ", sprintf("%.1f", as.numeric(difftime(Sys.time(), run_start, units = "mins"))), " min")
 
   out = list(Seed = seed,
-             Settings = list(study = "Misspecification2D", error_sd = error_sd, n_regions = n_regions, methods = methods,
+             Settings = list(study = "Misspecification2D", error_sd = error_sd, n_regions = n_regions, variants = variants, B = B,
                              patience = patience, t_end = t_end, t_step = t_step,
                              path_nsplits = path_nsplits, traj_nsplits = traj_nsplits, CL = CL,
                              sigma = sigma, k = k, start_range = start_range),

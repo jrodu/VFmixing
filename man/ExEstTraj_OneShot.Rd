@@ -22,7 +22,7 @@ A list with 9 elements:
 }
 }
 \source{
-\code{getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields)}
+\code{getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields, undersmooth = FALSE)}
 }
 \usage{
 ExEstTraj_OneShot

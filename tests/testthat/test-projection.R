@@ -37,7 +37,7 @@ test_that("block-diagonal helpers match the full products", {
 
 test_that("Projection reproduces the saved example path", {
   # ExEstPath_Projection was produced by the original implementation.
-  proj = quietly(getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC"))
+  proj = quietly(getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC", undersmooth = FALSE))
   expect_equal(proj$TimeSplits, ExEstPath_Projection$TimeSplits)
   expect_lt(rel_diff(proj$Path, ExEstPath_Projection$Path), 1e-6)
   expect_lt(rel_diff(proj$Cov, ExEstPath_Projection$Cov), 1e-6)

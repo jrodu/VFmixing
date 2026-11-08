@@ -1,7 +1,7 @@
 # A small, quick version of the study
-small_run = function(seed, progress = FALSE, ...){
+small_run = function(seed, progress = FALSE, B = 3, ...){
   runSimulationStudy_ErrorProcess2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
-                                    traj_nsplits = 20, progress = progress, ...)
+                                    traj_nsplits = 20, B = B, progress = progress, ...)
 }
 
 test_that("the study draws one SNR and returns its vector fields", {
@@ -18,7 +18,7 @@ test_that("the study draws one SNR and returns its vector fields", {
 
 test_that("every setting in a replicate shares the SNR", {
   run = runSimulationStudy_ErrorProcess2D(seed = 2, error_sd = c(low = 0.001, high = 0.1), n_regions = c(low = 2),
-                                          t_end = 4, traj_nsplits = 20, keep_fits = FALSE)
+                                          t_end = 4, traj_nsplits = 20, variants = "2x BIC", keep_fits = FALSE)
   expect_equal(nrow(run$Results), 2)
   expect_equal(run$Results$snr, rep(run$SNR, 2))
 })
@@ -50,9 +50,9 @@ test_that("one replicate records every metric", {
   expect_equal(nrow(r), 1)
   expect_true(is.na(r$error))
   expect_true(all(c("snr", "path_rmse", "traj_avg_sq_dist", "path_coverage_X1", "traj_coverage_Trajectory2",
-                    "path_width_X2", "traj_width_Trajectory1", "time_path", "time_traj", "time_total") %in% names(r)))
+                    "path_width_X2", "traj_width_Trajectory1", "variant", "time_total", "selection_share", "traj_coverage_within_Trajectory1") %in% names(r)))
   expect_true(r$path_rmse > 0 && r$traj_avg_sq_dist >= 0)
-  expect_named(run$Fits[[1]], c("EstPath", "EstTraj"))
+  expect_named(run$Fits[[1]][[1]], c("EstPath", "EstTraj", "Variance"))
 })
 
 test_that("a seed reproduces the replicate", {

@@ -50,7 +50,7 @@
 #'   \item{PosSplits}{A vector of boolean describing which regions in the spline can be split in the next iteration.}
 #' }
 #' 
-#' @source The example in the getEstimatedPaths_ByFours function.
+#' @source The example in the getEstimatedPaths_ByFours function, with the regions BIC selects (`undersmooth = FALSE`).
 "ExEstPath_ByFours"
 
 #' Example Estimated Path
@@ -73,7 +73,7 @@
 #'   \item{Free_Parameter_Cov}{A list of covariance matrices for the free coefficients for each dimension's spline.}
 #' }
 #' 
-#' @source The example in the getEstimatedPaths_FullRegression function.
+#' @source The example in the getEstimatedPaths_FullRegression function, with the regions BIC selects (`undersmooth = FALSE`).
 "ExEstPath_FullRegression"
 
 #' Example Estimated Path
@@ -99,7 +99,7 @@
 #'   \item{IntegralList}{A list of matrices used to project the unrestricted coefficients into the restricted space.}
 #' }
 #' 
-#' @source The example in the getEstimatedPaths_Projection function.
+#' @source The example in the getEstimatedPaths_Projection function, with the regions BIC selects (`undersmooth = FALSE`).
 "ExEstPath_Projection"
 
 #' Example Estimated Trajectory
@@ -116,7 +116,7 @@
 #'   \item{PosSplits}{A vector of boolean describing which regions in the spline can be split in the next iteration.}
 #' }
 #' 
-#' @source The example in the getEstimatedTrajectories_ByFours function.
+#' @source The example in the getEstimatedTrajectories_ByFours function, with the regions BIC selects (`undersmooth = FALSE`).
 "ExEstTraj_ByFours"
 
 #' Example Estimated Trajectory
@@ -137,7 +137,7 @@
 #'   \item{IntegralList_PathTraj}{A list of matrices used to transform the path coefficients into the trajectory coefficients.}
 #' }
 #' 
-#' @source `getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields)`
+#' @source `getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields, undersmooth = FALSE)`
 "ExEstTraj_OneShot"
 
 #' Example PropagationList
@@ -174,5 +174,5 @@
 #'   \item{Free_Parameter_Cov}{A list of covariance matrices for the free coefficients for each dimension's spline.}
 #' }
 #' 
-#' @source `getEstimatedPaths_FullFours(ExData, nsplits = 100)`
+#' @source `getEstimatedPaths_FullFours(ExData, nsplits = 100, undersmooth = FALSE)`
 "ExEstPath_FullFours"

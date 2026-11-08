@@ -9,7 +9,8 @@ getEstimatedPaths_FullRegression(
   nsplits,
   V_Smooth = F,
   Model_Selection_Type = "BIC",
-  patience = NULL
+  patience = NULL,
+  undersmooth = T
 )
 }
 \arguments{
@@ -25,6 +26,11 @@ Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.}
 \item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
 Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
 This is faster, but it can miss a better model that only appears after a long run without improvement.}
+
+\item{undersmooth}{a boolean. If TRUE (the default), return the candidate with twice as many regions as the one
+\code{Model_Selection_Type} selects (the first with at least that many, or the last if the search ends first).
+With \code{patience}, the criterion's choice is fixed when patience runs out and the search continues until it
+reaches twice that many regions. See \code{\link[=getEstimatedPaths_FullFours]{getEstimatedPaths_FullFours()}} for why.}
 }
 \value{
 an EstimatedPath object.

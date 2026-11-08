@@ -18,7 +18,7 @@ A list with 5 elements:
 }
 }
 \source{
-The example in the getEstimatedTrajectories_ByFours function.
+The example in the getEstimatedTrajectories_ByFours function, with the regions BIC selects (\code{undersmooth = FALSE}).
 }
 \usage{
 ExEstTraj_ByFours

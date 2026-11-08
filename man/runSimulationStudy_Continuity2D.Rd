@@ -6,9 +6,11 @@
 \usage{
 runSimulationStudy_Continuity2D(
   seed,
-  error_sd = c(low = 0.001, med = 0.01, high = 0.1),
-  n_regions = c(low = 2, med = 10, high = 50),
+  error_sd = c(low = 0.001),
+  n_regions = c(med = 10),
   continuity = c("discontinuous", "continuous", "differentiable"),
+  variants = "2x BIC + bootstrap",
+  B = 20,
   patience = 10,
   t_end = 20,
   t_step = 0.01,
@@ -32,6 +34,10 @@ runSimulationStudy_Continuity2D(
 \item{n_regions}{a named numeric vector. The number of regions in the true trajectories, named by complexity level.}
 
 \item{continuity}{a character vector, any of \code{"discontinuous"}, \code{"continuous"} and \code{"differentiable"}.}
+
+\item{variants}{a character vector of variants. See Details.}
+
+\item{B}{a whole number of at least 2. The number of bootstrap replicates for \code{"2x BIC + bootstrap"}.}
 
 \item{patience}{NULL or a positive integer. Passed to the path and trajectory searches.}
 
@@ -66,9 +72,9 @@ a list with:
 \item \code{Settings}: every setting used.
 \item \code{Grids}: the two random grids, data frames with columns \code{x}, \code{y}, \code{u} and \code{v}.
 \item \code{VectorFields}: the base vector fields function of each continuity, e.g. for \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}.
-\item \code{Results}: a data frame with one row per setting, holding the metrics.
+\item \code{Results}: a data frame with one row per setting and variant, holding the metrics.
 \item \code{Data}: for each setting, the true trajectory (\code{TrueTraj}), true path (\code{TrueData}) and observed data (\code{SimData}).
-\item \code{Fits}: if \code{keep_fits}, the estimated path and trajectory for each setting.
+\item \code{Fits}: if \code{keep_fits}, the estimated path, trajectory and (with the bootstrap) variance pieces for each setting and variant.
 }
 }
 \description{
@@ -114,11 +120,21 @@ number of draws is recorded. The observed data add independent normal noise
 with the error level's standard deviation to each position. All data sets
 are simulated (in a fixed order) before any fitting.
 
-\strong{Method.} Paths are fitted with \code{\link[=getEstimatedPaths_FullFours]{getEstimatedPaths_FullFours()}} and
-trajectories with \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}, using the setting's
-fields, both with BIC selection, C1 smoothness and \code{patience}.
+\strong{Variants.} Every variant fits a FullFours path and OneShot trajectories
+with BIC selection, C1 smoothness and \code{patience}. Each entry of \code{variants}
+is one of:
+\itemize{
+\item \code{"BIC"}: the regions BIC selects, for both the path and the trajectories.
+\item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
+\item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
+\item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
+\code{B} bootstrap replicates added to OneShot's covariance, through the law of
+total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+}
 
-\strong{Metrics.} For each setting:
+Each setting is fitted with its own continuity's fields.
+
+\strong{Metrics.} For each setting and variant:
 \itemize{
 \item \code{path_attempts}: the number of draws needed for a path inside the grid.
 \item \code{path_rmse}: root mean squared distance between the estimated and true
@@ -131,10 +147,14 @@ intervals, per dimension.
 confidence intervals, per trajectory.
 \item \verb{path_width_*}: \code{\link[=avgCIWidthPath]{avgCIWidthPath()}} with prediction intervals, per dimension.
 \item \verb{traj_width_*}: \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}}, per trajectory.
-\item \code{time_path}, \code{time_traj}, \code{time_total}: elapsed seconds.
+\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for \code{"2x BIC + bootstrap"},
+the same with OneShot's covariance alone (without the selection part).
+\item \code{selection_share}: for \code{"2x BIC + bootstrap"}, the average share of the
+trajectory variance that comes from the node selection.
+\item \code{time_total}: elapsed seconds for the fit (including the bootstrap).
 }
 
-If the fit fails, its metrics are \code{NA} and the error message is recorded.
+If a fit fails, its metrics are \code{NA} and the error message is recorded.
 }
 \examples{
 \donttest{
@@ -142,12 +162,12 @@ if(requireNamespace("akima", quietly = TRUE)){
   # One replicate with a single, quick setting
   run = runSimulationStudy_Continuity2D(seed = 1, error_sd = c(med = 0.01),
                                         n_regions = c(low = 2),
-                                        continuity = "continuous", t_end = 5)
+                                        continuity = "continuous", t_end = 5, variants = "2x BIC")
   run$Results
 }
 
 # The full study: one replicate per seed
-# runs = lapply(1:1000, function(s){
+# runs = lapply(1:100, function(s){
 #   runSimulationStudy_Continuity2D(seed = s, keep_fits = FALSE)
 # })
 # results = do.call(rbind, lapply(runs, `[[`, "Results"))
