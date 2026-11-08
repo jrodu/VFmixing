@@ -13,6 +13,12 @@
 #' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
 #' Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
 #' This is faster, but it can miss a better model that only appears after a long run without improvement.
+#' @param undersmooth a boolean. If TRUE (the default), return the candidate with twice as many regions as the one
+#' `Model_Selection_Type` selects (the first candidate with at least that many, or the last candidate if the search
+#' ends first), instead of the selected one. This undersmooths the fit, which reduces the bias of the estimated
+#' velocity so that the intervals of the trajectories estimated from it are centred closer to the truth.
+#' With `patience`, the criterion's choice is fixed when patience runs out, and the search then continues until
+#' it reaches twice that many regions (or returns at once if it already has).
 #'
 #' @returns an EstimatedPath object.
 #' @export
@@ -20,7 +26,7 @@
 #' @examples
 #' getEstimatedPaths_ByFours(ExData, 100)
 #'
-getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC", return_all = F, patience = NULL){
+getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC", return_all = F, patience = NULL, undersmooth = T){
 
   if(!(Model_Selection_Type %in% c("BIC", "AIC"))){
     stop("Model_Selection_Type must be \"BIC\" or \"AIC\" for the ByFours method.", call. = FALSE)
@@ -29,7 +35,7 @@ getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC"
   checkPatience(patience)
 
   # ByFours candidates are always C1.
-  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth = F)
+  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth = F, undersmooth = undersmooth)
 
   Data = data.frame(Data)
   n_dim = ncol(Data) - 1
@@ -468,14 +474,17 @@ getEstimatedPaths_ByFours = function(Data, nsplits, Model_Selection_Type = "BIC"
   }
 
   if(return_all){
+    # Keep the criterion's choice at the point patience ran out, for the caller's selection
+    attr(all_splits_est_path, "best_index") = if(is.null(patience)) NULL else tracker$best_index()
     return(all_splits_est_path)
   }
 
   if(!is.null(patience)){
     # The candidates were already scored while searching.
-    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type))
+    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type,
+                          undersmooth = undersmooth, best_index = tracker$best_index()))
   }
 
-  getBestSplitsPath(all_splits_est_path, show = F, V_Smooth = F, type = Model_Selection_Type)
+  getBestSplitsPath(all_splits_est_path, show = F, V_Smooth = F, type = Model_Selection_Type, undersmooth = undersmooth)
 
 }

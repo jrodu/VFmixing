@@ -12,7 +12,8 @@ getEstimatedTrajectories_OneShot(
   Model_Selection_Type = "BIC",
   Random_Path = F,
   quad_nodes = 20,
-  patience = NULL
+  patience = NULL,
+  undersmooth = T
 )
 }
 \arguments{
@@ -35,6 +36,9 @@ If TRUE, the path must've been estimated using the FullRegression, Projection or
 
 \item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
 Otherwise, stop after this many consecutive candidates without improving the criterion. See Details.}
+
+\item{undersmooth}{a boolean. If TRUE (the default), return the candidate with twice as many regions as the
+criterion's choice. See Details.}
 }
 \value{
 an EstimatedTrajectory object.
@@ -59,6 +63,16 @@ splits. By default every candidate is fit and the best is chosen with
 candidates in a row have failed to improve on the best criterion so far.
 This is much faster when the best model has few regions, but it can miss a
 better model that would only appear after a long run without improvement.
+
+With \code{undersmooth = TRUE} (the default), the candidate with twice as many
+regions as the criterion's choice is returned instead (the first with at
+least that many, or the last if the search ends first). With \code{patience}, the
+criterion's choice is fixed when patience runs out and the search continues
+until it reaches twice that many regions. A trajectory spline whose nodes do
+not line up with the truth's can't follow it exactly; the extra regions let
+it bend between misplaced nodes, which reduces the bias of the estimates
+relative to their standard errors. See \code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}} for
+intervals that also account for the node selection.
 }
 \examples{
 \donttest{

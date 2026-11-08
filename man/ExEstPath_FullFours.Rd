@@ -24,7 +24,7 @@ A list with 11 elements:
 }
 }
 \source{
-\code{getEstimatedPaths_FullFours(ExData, nsplits = 100)}
+\code{getEstimatedPaths_FullFours(ExData, nsplits = 100, undersmooth = FALSE)}
 }
 \usage{
 ExEstPath_FullFours

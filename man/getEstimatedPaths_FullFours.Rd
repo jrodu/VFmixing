@@ -9,7 +9,8 @@ getEstimatedPaths_FullFours(
   nsplits,
   V_Smooth = F,
   Model_Selection_Type = "BIC",
-  patience = NULL
+  patience = NULL,
+  undersmooth = T
 )
 }
 \arguments{
@@ -26,6 +27,10 @@ Must pick from the following: BIC, AIC, BICVel, VarPos, VarVel, VarPosVel. See D
 \item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is considered.
 Otherwise, stop after this many consecutive candidates that do not improve the selection criterion. See Details.
 This is faster, but it can miss a better model that only appears after a long run without improvement.}
+
+\item{undersmooth}{a boolean. If TRUE (the default), use the candidate with twice as many regions as the one
+\code{Model_Selection_Type} selects (the first candidate with at least that many, or the last if the search ends first).
+See Details.}
 }
 \value{
 an EstimatedPath object, with the same elements as one from
@@ -60,6 +65,16 @@ FullRegression node search.
 to improve the criterion. With \code{"BIC"} or \code{"AIC"} it stops the ByFours node
 search; with the covariance-based criteria the (cheap) node search always
 runs in full and \code{patience} stops the full regressions on its candidates.
+
+\strong{Undersmoothing (\code{undersmooth = TRUE}, the default).} The criterion picks
+the number of regions that balances fit against complexity for the path
+itself. Trajectories are estimated from the path's velocity, which is biased
+at that level: the bias is small next to the positional noise but large next
+to the trajectories' standard errors, so their intervals undercover. Using
+twice as many regions (the "2x BIC" rule) cuts that bias by roughly a factor
+of eight for a modest increase in variance. With \code{patience}, the criterion's
+choice is fixed when patience runs out and the search continues until it
+reaches twice that many regions.
 }
 \examples{
 ExEstPath_FullFours <- getEstimatedPaths_FullFours(ExData, nsplits = 100)

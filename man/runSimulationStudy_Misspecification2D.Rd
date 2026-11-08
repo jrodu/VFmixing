@@ -6,10 +6,10 @@
 \usage{
 runSimulationStudy_Misspecification2D(
   seed,
-  error_sd = c(low = 0.001, med = 0.01, high = 0.1),
-  n_regions = c(low = 2, med = 10, high = 50),
-  methods = c("ByFours-ByFours", "FullRegression-OneShot", "FullFours-OneShot",
-    "Projection-OneShot"),
+  error_sd = c(low = 0.001),
+  n_regions = c(med = 10),
+  variants = "2x BIC + bootstrap",
+  B = 20,
   patience = 10,
   t_end = 20,
   t_step = 0.01,
@@ -31,7 +31,9 @@ runSimulationStudy_Misspecification2D(
 
 \item{n_regions}{a named numeric vector. The number of regions in the true trajectories, named by complexity level.}
 
-\item{methods}{a character vector of method pairs. See Details.}
+\item{variants}{a character vector of variants. See Details.}
+
+\item{B}{a whole number of at least 2. The number of bootstrap replicates for \code{"2x BIC + bootstrap"}.}
 
 \item{patience}{NULL or a positive integer. Passed to every path and trajectory search.}
 
@@ -65,9 +67,9 @@ a list with:
 \item \code{VectorFields}: the true base vector fields function, used to generate the data.
 \item \code{FitVectorFields}: the misspecified base vector fields function, used to fit
 the trajectories, e.g. for \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}.
-\item \code{Results}: a data frame with one row per setting and method pair, holding the metrics.
+\item \code{Results}: a data frame with one row per setting and variant, holding the metrics.
 \item \code{Data}: for each setting, the true trajectory (\code{TrueTraj}), true path (\code{TrueData}) and observed data (\code{SimData}).
-\item \code{Fits}: if \code{keep_fits}, the estimated path and trajectory for each setting and method pair.
+\item \code{Fits}: if \code{keep_fits}, the estimated path, trajectory and (with the bootstrap) variance pieces for each setting and variant.
 }
 }
 \description{
@@ -79,7 +81,7 @@ trajectories are fitted with scaled versions of them, the unit-length
 fields \eqn{(3y, -4x)/\|(3y, 4x)\|} and \eqn{(4x, 3y)/\|(4x, 3y)\|}. All
 are undefined at the origin itself. For every combination of positional
 error level and true trajectory complexity it simulates a data set and fits
-each path and trajectory method pair, recording accuracy, coverage, interval
+each variant of the method, recording accuracy, coverage, interval
 width and run time. Run it with seeds 1, 2, ..., N to reproduce the full
 study.
 
@@ -95,16 +97,24 @@ position drawn uniformly on \code{start_range} in each dimension, with time step
 \code{t_step}. The observed data add independent normal noise with the error
 level's standard deviation to each position. All data sets are simulated
 (in a fixed order) before any fitting, so the data for a seed do not depend
-on which methods are run.
+on which variants are run.
 
-\strong{Methods.} Each entry of \code{methods} is \code{"<path method>-<trajectory method>"}.
-Path methods: \code{ByFours}, \code{FullRegression}, \code{FullFours}, \code{Projection}.
-Trajectory methods: \code{ByFours}, \code{OneShot}. Selection uses BIC with C1
-smoothness, and \code{patience} is passed to every search. The trajectories are
-fitted with the misspecified fields, and their estimates are compared with
-the true trajectories.
+\strong{Variants.} Every variant fits a FullFours path and OneShot trajectories
+with BIC selection, C1 smoothness and \code{patience}. Each entry of \code{variants}
+is one of:
+\itemize{
+\item \code{"BIC"}: the regions BIC selects, for both the path and the trajectories.
+\item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
+\item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
+\item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
+\code{B} bootstrap replicates added to OneShot's covariance, through the law of
+total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+}
 
-\strong{Metrics.} For each setting and method pair:
+The trajectories are fitted with the misspecified fields, and their
+estimates are compared with the true trajectories.
+
+\strong{Metrics.} For each setting and variant:
 \itemize{
 \item \code{path_rmse}: root mean squared distance between the estimated and true
 positions at the data times.
@@ -116,23 +126,24 @@ intervals, per dimension.
 confidence intervals, per trajectory.
 \item \verb{path_width_*}: \code{\link[=avgCIWidthPath]{avgCIWidthPath()}} with prediction intervals, per dimension.
 \item \verb{traj_width_*}: \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}}, per trajectory.
-\item \code{time_path}, \code{time_traj}, \code{time_total}: elapsed seconds.
+\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for \code{"2x BIC + bootstrap"},
+the same with OneShot's covariance alone (without the selection part).
+\item \code{selection_share}: for \code{"2x BIC + bootstrap"}, the average share of the
+trajectory variance that comes from the node selection.
+\item \code{time_total}: elapsed seconds for the fit (including the bootstrap).
 }
 
-Coverage and width need a covariance structure, so they are \code{NA} for
-ByFours paths and trajectories. If a method fails, its metrics are \code{NA} and
-the error message is recorded.
+If a fit fails, its metrics are \code{NA} and the error message is recorded.
 }
 \examples{
 \donttest{
 # One replicate with a single, quick setting
 run = runSimulationStudy_Misspecification2D(seed = 1, error_sd = c(med = 0.01),
-                                n_regions = c(low = 2), t_end = 5,
-                                methods = "FullFours-OneShot")
+                                n_regions = c(low = 2), t_end = 5, variants = "2x BIC")
 run$Results
 
 # The full study: one replicate per seed
-# runs = lapply(1:1000, function(s){
+# runs = lapply(1:100, function(s){
 #   runSimulationStudy_Misspecification2D(seed = s, keep_fits = FALSE)
 # })
 # results = do.call(rbind, lapply(runs, `[[`, "Results"))

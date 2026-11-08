@@ -7,17 +7,22 @@
 #' Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.
 #' BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel need a covariance structure,
 #' so they can only be used with FullRegression, Projection and FullFours.
+#' @param undersmooth a boolean. If TRUE, return the first candidate with at least twice as many regions
+#' as the one the criterion selects (or the last candidate, if none has that many), instead of the selected one.
+#' See [getEstimatedPaths_FullFours()] for why.
+#' @param best_index NULL or an integer. The index of the candidate the criterion selected, if already known
+#' (for example from a search that stopped early). If NULL, it is found from the criterion.
 #'
 #' @returns an EstimatedPath object.
 #' @export
 #'
-getBestSplitsPath = function(EstPath, show = F, V_Smooth = T, type = "BIC"){
+getBestSplitsPath = function(EstPath, show = F, V_Smooth = T, type = "BIC", undersmooth = F, best_index = NULL){
 
   checkPathSelectionType(type, EstPath[[1]])
 
   values = pathSelectionValues(EstPath, type, V_Smooth)
 
-  selectBestPath(EstPath, values, type, show)
+  selectBestPath(EstPath, values, type, show, undersmooth = undersmooth, best_index = best_index)
 
 }
 
@@ -209,10 +214,17 @@ pathBestIndex = function(values, type){
   which.min(values)
 }
 
-# Pick, report and return the best candidate path.
-selectBestPath = function(EstPath, values, type, show = F){
+# Pick, report and return the best candidate path. With undersmooth, return the
+# first candidate with at least twice the selected number of regions instead.
+selectBestPath = function(EstPath, values, type, show = F, undersmooth = F, best_index = NULL){
 
-  best_index = pathBestIndex(values, type)
+  if(is.null(best_index)){
+    best_index = pathBestIndex(values, type)
+  }
+
+  if(undersmooth){
+    best_index = undersmoothIndex(sapply(EstPath, function(p){length(p$Path)}), best_index)
+  }
 
   reportBestRegions(length(EstPath[[best_index]]$Path))
   if(show){
@@ -236,16 +248,69 @@ checkPatience = function(patience){
 # Tracks path selection values as candidates are produced, so a search can stop
 # once `patience` candidates in a row have not improved on the best so far.
 # add() scores a new candidate and returns TRUE when the search should stop.
-pathPatienceTracker = function(patience, type, V_Smooth){
+# With undersmooth, the best candidate is fixed when patience runs out, and the
+# search continues until a candidate has twice its number of regions.
+pathPatienceTracker = function(patience, type, V_Smooth, undersmooth = F){
 
-  values = NULL
-
-  add = function(candidate){
-    v = pathSelectionValues(list(candidate), type, V_Smooth)
-    values <<- if(is.null(values)) v else if(is.matrix(v)) cbind(values, v) else c(values, v)
-    n = if(is.matrix(values)) ncol(values) else length(values)
-    !is.null(patience) && (n - pathBestIndex(values, type)) >= patience
+  scoreOne = function(candidate){
+    pathSelectionValues(list(candidate), type, V_Smooth)
   }
 
-  list(add = add, values = function(){values})
+  patienceTracker(patience, scoreOne, function(values){pathBestIndex(values, type)},
+                  function(candidate){length(candidate$Path)}, undersmooth)
+}
+
+# The shared patience logic for the path and trajectory searches.
+# * score(candidate): the candidate's selection value (a number, or a column for BICVel).
+# * best(values): the index of the best candidate so far.
+# * n_regions(candidate): the candidate's number of regions.
+# add() returns TRUE when the search should stop: once `patience` candidates in
+# a row have not improved on the best, or, with undersmooth, once a candidate
+# has at least twice the regions of the best at the moment patience ran out.
+# best_index() is that best candidate (or the best overall if patience never ran out).
+patienceTracker = function(patience, score, best, n_regions, undersmooth = F){
+
+  values = NULL
+  regions = c()
+  fixed_best = NULL
+
+  add = function(candidate){
+    v = score(candidate)
+    values <<- if(is.null(values)) v else if(is.matrix(v)) cbind(values, v) else c(values, v)
+    regions <<- c(regions, n_regions(candidate))
+    n = length(regions)
+
+    if(is.null(patience)){
+      return(FALSE)
+    }
+
+    if(is.null(fixed_best) && (n - best(values)) >= patience){
+      fixed_best <<- best(values)
+    }
+
+    if(is.null(fixed_best)){
+      return(FALSE)
+    }
+
+    !undersmooth || regions[n] >= 2*regions[fixed_best]
+  }
+
+  best_index = function(){
+    if(!is.null(fixed_best)) fixed_best else if(is.null(values)) NULL else best(values)
+  }
+
+  list(add = add, values = function(){values}, best_index = best_index)
+}
+
+# The undersmoothed choice: the first candidate with at least twice the regions
+# of the selected one, or the last candidate if none has that many.
+undersmoothIndex = function(n_regions, best_index){
+
+  idx = which(n_regions >= 2*n_regions[best_index])[1]
+
+  if(is.na(idx)){
+    idx = length(n_regions)
+  }
+
+  idx
 }

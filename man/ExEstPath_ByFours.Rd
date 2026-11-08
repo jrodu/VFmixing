@@ -18,7 +18,7 @@ A list with 5 elements:
 }
 }
 \source{
-The example in the getEstimatedPaths_ByFours function.
+The example in the getEstimatedPaths_ByFours function, with the regions BIC selects (\code{undersmooth = FALSE}).
 }
 \usage{
 ExEstPath_ByFours

@@ -83,6 +83,18 @@ on every candidate, so they are slower. Every path method also takes a
 fail to improve the criterion (see Step 2 for an example). It makes the biggest
 difference with the slower criteria and with `getEstimatedPaths_FullRegression()`.
 
+By default, every node search also *undersmooths*: it returns the candidate
+with twice as many regions as the criterion selects (the "2x BIC" rule,
+`undersmooth = TRUE`). The criterion balances fit against complexity for the
+path's positions, but the trajectories are estimated from the path's
+velocity, and at that level the velocity is biased: the bias is small next to
+the positional noise, but large next to the trajectories' standard errors, so
+their intervals would undercover. Twice the regions cuts that bias by roughly a
+factor of eight for a modest increase in variance. With `patience`, the
+criterion's choice is fixed when patience runs out, and the search continues
+until it reaches twice that many regions. Use `undersmooth = FALSE` for the
+criterion's own choice.
+
 ```{r, results = "hide"}
 PathTime <- system.time(
   EstPath <- getEstimatedPaths_FullFours(Data = Data, nsplits = 100)
@@ -127,7 +139,8 @@ The coverage rates for `r paste(names(Data)[-1], collapse = " and ")` are
 `r paste0(round(100*PathCovRate, 1), "%", collapse = " and ")`, near the
 nominal 95%.
 
-This estimated path is also included in the package as `ExEstPath_FullFours`.
+The package includes the BIC version of this path (`undersmooth = FALSE`) as
+`ExEstPath_FullFours`.
 
 <details>
 <summary>Other path methods</summary>
@@ -159,6 +172,11 @@ covariance structure for the trajectories under the assumption that the
 mixing vector fields are relatively constant in a small window defined by the
 path error. A faster alternative without a covariance structure is
 `getEstimatedTrajectories_ByFours()`.
+
+The trajectory node search undersmooths in the same way by default (twice the
+regions BIC selects). A trajectory spline whose nodes don't line up with the
+truth's can't follow it exactly; the extra regions let it bend between
+misplaced nodes.
 
 ```{r, results = "hide"}
 TrajTime <- system.time(
@@ -227,3 +245,94 @@ The average squared distance is extremely small, and the coverage rates for the
 two trajectories are `r paste0(round(100*TrajCovRate, 1), "%", collapse = " and ")`,
 `r if (all(TrajCovRate >= 0.95)) "at or above the nominal 95%" else "with at least one below the nominal 95%"`.
 `r if (all(TrajCovRate >= 0.95)) "For this example the intervals are, if anything, conservative." else "This suggests the assumption that the mixing vector fields are constant within the error region of a data point is not fully met for this data."`
+
+### The full method, with the node-selection uncertainty
+
+`getEstimatedTrajectories_Full()` runs both steps on the data in one call
+("FullFours" path, then "One-Shot" trajectories, both undersmoothed by
+default). One-Shot's covariance treats the selected nodes as fixed, but they
+are chosen from the data, so they would vary from data set to data set. With
+`bootstrap = TRUE`, that extra uncertainty is added through the law of total
+variance:
+
+$$\mathrm{Var}(\hat\beta) = \underbrace{E[\mathrm{Var}(\hat\beta \mid \text{nodes})]}_{\text{One-Shot's covariance}} + \underbrace{\mathrm{Var}(E[\hat\beta \mid \text{nodes}])}_{\text{node selection}}$$
+
+One-Shot provides the first part exactly. For the second, a residual
+bootstrap reruns both node searches on `B` resampled data sets, then fits each
+replicate's nodes, without noise, to the fitted path: the spread of those fits
+is the node-selection variance. Because those fits have no noise in them, a
+small `B` (20 by default) is enough.
+
+```{r, results = "hide"}
+set.seed(1)
+FullTime <- system.time(
+  Fit <- getEstimatedTrajectories_Full(Data = Data, baseVectorFields = baseVectorFields,
+                                       traj_nsplits = 100, bootstrap = TRUE, B = 20,
+                                       quiet = TRUE)
+)
+```
+
+The run time, in seconds, with 20 bootstrap replicates:
+
+```{r}
+FullTime
+```
+
+The returned trajectory's `Cov` is the total, so the plotting and coverage
+functions use the full uncertainty. The separate pieces are kept in
+`Fit$Variance`, including the pointwise variances on a time grid:
+
+```{r}
+head(Fit$Variance$Pointwise)
+
+# Average share of the trajectory variance that comes from the node selection
+aggregate(selection_share ~ trajectory, data = Fit$Variance$Pointwise, FUN = mean)
+```
+
+Coverage of the true trajectories with One-Shot's covariance alone, and with
+the node-selection part added:
+
+```{r}
+OneShotOnly <- Fit$EstTraj
+OneShotOnly$Cov <- Fit$Variance$Within
+
+coverageRateTraj(OneShotOnly, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
+coverageRateTraj(Fit$EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
+```
+
+```{r}
+visualizeEstTraj(EstTraj = Fit$EstTraj, TrueTraj = TrueTraj$Traj,
+                 TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = Fit$EstPath,
+                 baseVectorFields = baseVectorFields, t_grid_size = 0.01,
+                 CL = 0.95, Cos_Cutoff = 0.91)
+```
+
+The selection part still conditions on the base vector fields evaluated along
+the estimated path, so the error from the path position in those evaluations
+is not included.
+
+## Simulation studies
+
+Each study is one self-contained function that runs one fully seeded
+replicate and returns its data, fits and metrics. A matching script in
+`inst/simulations/` runs seeds 1 to 100, saving one file per seed so a run can
+be stopped and resumed, or split across machines by seed.
+
+| Study | Vector fields | Settings | Variants |
+|---|---|---|---|
+| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap |
+| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap |
+| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap |
+| `runSimulationStudy_Collinearity2D()` | x-axis and a field at a random angle | low error, medium complexity | 2x BIC + bootstrap |
+| `runSimulationStudy_ErrorProcess2D()` | rotation and expansion, noisy velocity at a random SNR | low error, medium complexity | 2x BIC + bootstrap |
+| `runSimulationStudy_Misspecification2D()` | data from rotation and expansion, fit with scaled versions | low error, medium complexity | 2x BIC + bootstrap |
+| `runSimulationStudy_Continuity2D()` | random gridded fields, nearest / bilinear / bicubic | low error, medium complexity, 3 continuities | 2x BIC + bootstrap |
+
+The Axis study isolates the effect of each piece: the fields are constant, so
+any undercoverage comes from the bias and the node selection rather than from
+evaluating the fields along an estimated path.
+
+```r
+run <- runSimulationStudy_Axis2D(seed = 1, keep_fits = FALSE)
+run$Results
+```

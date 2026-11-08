@@ -145,6 +145,10 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
 #' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
 #' Otherwise, stop the node search after this many consecutive candidates that do not improve the selection criterion.
 #' This is faster, but it can miss a better model that only appears after a long run without improvement.
+#' @param undersmooth a boolean. If TRUE (the default), return the candidate with twice as many regions as the one
+#' `Model_Selection_Type` selects (the first with at least that many, or the last if the search ends first).
+#' With `patience`, the criterion's choice is fixed when patience runs out and the search continues until it
+#' reaches twice that many regions. See [getEstimatedPaths_FullFours()] for why.
 #'
 #' @returns an EstimatedPath object.
 #' @export
@@ -154,11 +158,11 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
 #' getEstimatedPaths_Projection(ExData, 100, V_Smooth = FALSE, Model_Selection_Type = "BIC")
 #' }
 #'
-getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC", patience = NULL){
+getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selection_Type = "BIC", patience = NULL, undersmooth = T){
 
   checkPathSelectionType(Model_Selection_Type)
   checkPatience(patience)
-  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth)
+  tracker = pathPatienceTracker(patience, Model_Selection_Type, V_Smooth, undersmooth = undersmooth)
 
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
   
@@ -206,10 +210,11 @@ getEstimatedPaths_Projection = function(Data, nsplits, V_Smooth = F, Model_Selec
 
   if(!is.null(patience)){
     # The candidates were already scored while searching.
-    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type))
+    return(selectBestPath(all_splits_est_path, tracker$values(), Model_Selection_Type,
+                          undersmooth = undersmooth, best_index = tracker$best_index()))
   }
 
-  getBestSplitsPath(EstPath = all_splits_est_path, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
+  getBestSplitsPath(EstPath = all_splits_est_path, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth, undersmooth = undersmooth)
 }
 
 

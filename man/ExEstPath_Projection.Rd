@@ -27,7 +27,7 @@ A list with 14 elements:
 }
 }
 \source{
-The example in the getEstimatedPaths_Projection function.
+The example in the getEstimatedPaths_Projection function, with the regions BIC selects (\code{undersmooth = FALSE}).
 }
 \usage{
 ExEstPath_Projection

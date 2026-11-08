@@ -24,7 +24,7 @@ A list with 11 elements:
 }
 }
 \source{
-The example in the getEstimatedPaths_FullRegression function.
+The example in the getEstimatedPaths_FullRegression function, with the regions BIC selects (\code{undersmooth = FALSE}).
 }
 \usage{
 ExEstPath_FullRegression

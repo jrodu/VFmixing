@@ -74,25 +74,26 @@ getLikelihoodTraj = function(EstTraj){
 #' VarPos needs a covariance structure, so it can only be used with OneShot.
 #' "BICPos" is no longer available: it needed a velocity covariance matrix that no trajectory method produces.
 #' @param V_Smooth a boolean. TRUE if the trajectory cubic splines had C2 smoothness. FALSE if C1.
+#' @param undersmooth a boolean. If TRUE, return the first candidate with at least twice as many regions
+#' as the one the criterion selects (or the last candidate, if none has that many), instead of the selected one.
+#' @param best_index NULL or an integer. The index of the candidate the criterion selected, if already known
+#' (for example from a search that stopped early). If NULL, it is found from the criterion.
 #'
 #' @returns an EstimatedTraj object.
 #' @export
 #'
-getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smooth = T){
+getBestSplitsTraj = function(EstTrajList, EstPath, show = F, type = "BIC", V_Smooth = T, undersmooth = F, best_index = NULL){
 
   type = checkTrajSelectionType(type)
-  
+
   criterion = trajSelectionCriterion(EstTrajList, EstPath, type, V_Smooth)
-  
-  best_index = which.min(criterion)
-  
-  reportBestRegions(length(EstTrajList[[best_index]]$Traj))
+
   if(show){
     print(criterion)
   }
-  
-  EstTrajList[[best_index]]
-  
+
+  selectBestTraj(EstTrajList, criterion, undersmooth = undersmooth, best_index = best_index)
+
 }
 
 # Validate a trajectory model-selection type and resolve aliases.
@@ -191,22 +192,26 @@ trajSelectionCriterion = function(EstTrajList, EstPath, type, V_Smooth){
 # Tracks trajectory selection values as candidates are produced, so a search
 # can stop once `patience` candidates in a row have not improved on the best so
 # far. add() scores a new candidate and returns TRUE when the search should stop.
-trajPatienceTracker = function(patience, EstPath, type, V_Smooth){
+trajPatienceTracker = function(patience, EstPath, type, V_Smooth, undersmooth = F){
 
-  values = c()
-
-  add = function(candidate){
-    values <<- c(values, trajSelectionCriterion(list(candidate), EstPath, type, V_Smooth))
-    !is.null(patience) && (length(values) - which.min(values)) >= patience
+  scoreOne = function(candidate){
+    trajSelectionCriterion(list(candidate), EstPath, type, V_Smooth)
   }
 
-  list(add = add, values = function(){values})
+  patienceTracker(patience, scoreOne, which.min, function(candidate){length(candidate$Traj)}, undersmooth)
 }
 
 # Pick, report and return the best candidate trajectory from stored values.
-selectBestTraj = function(EstTrajList, values){
+selectBestTraj = function(EstTrajList, values, undersmooth = F, best_index = NULL){
 
-  best_index = which.min(values)
+  if(is.null(best_index)){
+    best_index = which.min(values)
+  }
+
+  if(undersmooth){
+    best_index = undersmoothIndex(sapply(EstTrajList, function(x){length(x$Traj)}), best_index)
+  }
+
   reportBestRegions(length(EstTrajList[[best_index]]$Traj))
   EstTrajList[[best_index]]
 

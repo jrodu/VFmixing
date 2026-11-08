@@ -12,7 +12,8 @@ getEstimatedTrajectories_ByFours(
   data_int = 0.001,
   Random_Path = F,
   Path_V_Smooth,
-  patience = NULL
+  patience = NULL,
+  undersmooth = T
 )
 }
 \arguments{
@@ -35,6 +36,10 @@ If missing, it is detected from EstPath.}
 \item{patience}{NULL or a positive integer. If NULL (the default), every candidate up to \code{nsplits} is fit.
 Otherwise, stop the node search after this many consecutive candidates that do not improve the BIC.
 This is faster, but it can miss a better model that only appears after a long run without improvement.}
+
+\item{undersmooth}{a boolean. If TRUE (the default), return the candidate with twice as many regions as the one
+the BIC selects (the first with at least that many, or the last if the search ends first). With \code{patience},
+the BIC's choice is fixed when patience runs out and the search continues until it reaches twice that many regions.}
 }
 \value{
 an EstimatedTrajectory object.

@@ -25,7 +25,8 @@ test_that("Gauss-Legendre rule integrates polynomials exactly", {
 test_that("OneShot reproduces the saved example trajectory", {
   # A regression check against ExEstTraj_OneShot. The comparison with the original
   # adaptive integrals is the "quadrature integrals match" test above.
-  fast = quietly(getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields))
+  fast = quietly(getEstimatedTrajectories_OneShot(ExEstPath_FullFours, nsplits = 100, baseVectorFields = baseVectorFields,
+                                                  undersmooth = FALSE))
 
   expect_equal(fast$TimeSplits, ExEstTraj_OneShot$TimeSplits)
   expect_lt(rel_diff(unlist(fast$Traj), unlist(ExEstTraj_OneShot$Traj)), 1e-6)

@@ -4,7 +4,14 @@
 \alias{getBestSplitsPath}
 \title{Path Model Selection}
 \usage{
-getBestSplitsPath(EstPath, show = F, V_Smooth = T, type = "BIC")
+getBestSplitsPath(
+  EstPath,
+  show = F,
+  V_Smooth = T,
+  type = "BIC",
+  undersmooth = F,
+  best_index = NULL
+)
 }
 \arguments{
 \item{EstPath}{a list of EstimatedPath Objects. These should all be related using the same data with an increasing number of splits.}
@@ -17,6 +24,13 @@ getBestSplitsPath(EstPath, show = F, V_Smooth = T, type = "BIC")
 Must pick from the following: BIC, BICVel, AIC, VarPos, VarVel, VarPosVel.
 BIC and AIC can be used with any path method. BICVel, VarPos, VarVel, VarPosVel need a covariance structure,
 so they can only be used with FullRegression, Projection and FullFours.}
+
+\item{undersmooth}{a boolean. If TRUE, return the first candidate with at least twice as many regions
+as the one the criterion selects (or the last candidate, if none has that many), instead of the selected one.
+See \code{\link[=getEstimatedPaths_FullFours]{getEstimatedPaths_FullFours()}} for why.}
+
+\item{best_index}{NULL or an integer. The index of the candidate the criterion selected, if already known
+(for example from a search that stopped early). If NULL, it is found from the criterion.}
 }
 \value{
 an EstimatedPath object.

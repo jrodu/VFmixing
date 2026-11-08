@@ -90,6 +90,16 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' This is much faster when the best model has few regions, but it can miss a
 #' better model that would only appear after a long run without improvement.
 #'
+#' With `undersmooth = TRUE` (the default), the candidate with twice as many
+#' regions as the criterion's choice is returned instead (the first with at
+#' least that many, or the last if the search ends first). With `patience`, the
+#' criterion's choice is fixed when patience runs out and the search continues
+#' until it reaches twice that many regions. A trajectory spline whose nodes do
+#' not line up with the truth's can't follow it exactly; the extra regions let
+#' it bend between misplaced nodes, which reduces the bias of the estimates
+#' relative to their standard errors. See [getEstimatedTrajectories_Full()] for
+#' intervals that also account for the node selection.
+#'
 #' @param EstPath an EstimatedPath object.
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
 #' @param baseVectorFields a baseVectorField object.
@@ -102,6 +112,8 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' @param quad_nodes a positive integer. The number of Gauss-Legendre nodes per piece of each region. See Details.
 #' @param patience NULL or a positive integer. If NULL (the default), every candidate up to `nsplits` is fit.
 #' Otherwise, stop after this many consecutive candidates without improving the criterion. See Details.
+#' @param undersmooth a boolean. If TRUE (the default), return the candidate with twice as many regions as the
+#' criterion's choice. See Details.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -119,7 +131,7 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #'      EstPath = ExEstPath_FullFours,
 #'      nsplits = 100, baseVectorFields = baseVectorFields, patience = 10)
 #'
-getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL){
+getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL, undersmooth = T){
 
   Model_Selection_Type = checkTrajSelectionType(Model_Selection_Type)
 
@@ -155,9 +167,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
     runEstTrajStep_OneShot(EstPath = EstPath, TimeSplits = time_splits, RegionCaches = caches, Omega_p = Omega_p, n_dim = n_dim, n_models = n_models, Traj_VSmooth = V_Smooth)
   }
 
-  candidateCriterion = function(cand){
-    trajSelectionCriterion(list(cand), EstPath, Model_Selection_Type, V_Smooth)
-  }
+  tracker = trajPatienceTracker(patience, EstPath, Model_Selection_Type, V_Smooth, undersmooth = undersmooth)
 
   # Start from a single region and split from there
   time_splits = range(EstPath$TimeSplits)
@@ -169,8 +179,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   all_splits_est_traj[[1]] = fitCandidate(time_splits, caches)
 
   if(!is.null(patience)){
-    best_crit = candidateCriterion(all_splits_est_traj[[1]])
-    since_best = 0
+    tracker$add(all_splits_est_traj[[1]])
   }
 
   svMisc::progress(1, max.value = nsplits, progress.bar = T, console = T)
@@ -204,22 +213,19 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
         break
       }
 
-      if(!is.null(patience)){
-        cur_crit = candidateCriterion(all_splits_est_traj[[length(all_splits_est_traj)]])
-        if(cur_crit < best_crit){
-          best_crit = cur_crit
-          since_best = 0
-        } else{
-          since_best = since_best + 1
-          if(since_best >= patience){
-            break
-          }
-        }
+      if(!is.null(patience) && tracker$add(all_splits_est_traj[[length(all_splits_est_traj)]])){
+        break
       }
 
     }
   }
 
-  getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth)
+  if(!is.null(patience)){
+    # The candidates were already scored while searching.
+    return(selectBestTraj(all_splits_est_traj, tracker$values(), undersmooth = undersmooth, best_index = tracker$best_index()))
+  }
+
+  getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth,
+                    undersmooth = undersmooth)
 
 }

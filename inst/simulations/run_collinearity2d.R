@@ -1,4 +1,4 @@
-# Collinearity 2-D simulation study
+# Collinearity2D simulation study
 #
 # Runs runSimulationStudy_Collinearity2D() once per seed and saves each replicate to its
 # own file, so a long run can be stopped and restarted without redoing finished
@@ -7,17 +7,17 @@
 # Find this script with:
 #   system.file("simulations", "run_collinearity2d.R", package = "VFmixing")
 #
-# Each replicate draws one angle theta and covers 3 error levels x 3 trajectory
-# complexities with FullFours-OneShot. It takes roughly 15 seconds, so 1000
-# seeds is on the order of 4 hours on one core. Seeds are independent, so they
-# can be split across machines or cores (for example, run seeds 1:250 on one
-# and 251:500 on another).
+# Each seed draws one angle theta and fits the low error, medium complexity
+# setting with 2x BIC + bootstrap (B = 20).
+# Each seed takes roughly 1 minute on one core. Seeds are independent,
+# so they can be split across machines or cores (for example, seeds 1:50 on one
+# and 51:100 on another, or one block of seeds per task of a job array).
 
 library(VFmixing)
 
-seeds = 1:1000
-out_dir = "collinearity2d_results"    # one .rds file per seed is written here
-keep_fits = FALSE                     # TRUE keeps every fitted path and trajectory (~25 MB per seed)
+seeds = 1:100
+out_dir = "collinearity2d_results"   # one .rds file per seed is written here
+keep_fits = FALSE        # TRUE also keeps every fitted path, trajectory and variance piece
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
@@ -37,13 +37,18 @@ for(seed in seeds){
 }
 
 # Combine the results of every finished seed
-files = list.files(out_dir, pattern = "^collinearity2d_seed\\d+\\.rds$", full.names = TRUE)
+files = list.files(out_dir, pattern = "^collinearity2d_seed[0-9]+[.]rds$", full.names = TRUE)
 results = do.call(rbind, lapply(files, function(f){readRDS(f)$Results}))
 
 saveRDS(results, file.path(out_dir, "collinearity2d_results_all.rds"))
 
-# Example summary: mean of each metric by error level and complexity (to study
+# Example summary: mean of each metric by error level, complexity and variant (to study
 # theta, model the metrics in results against results$theta instead)
 metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_sd", "n_true_regions", "theta"))
-summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity")], FUN = mean, na.rm = TRUE)
+summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity", "variant")], FUN = mean, na.rm = TRUE)
 print(summary_table)
+
+# Monte Carlo standard error of the mean coverage of the first trajectory, by the same groups
+mc_se = aggregate(results["traj_coverage_Trajectory1"], by = results[, c("error_level", "complexity", "variant")],
+                  FUN = function(x){stats::sd(x, na.rm = TRUE)/sqrt(sum(!is.na(x)))})
+print(mc_se)
