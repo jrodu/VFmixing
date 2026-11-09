@@ -249,7 +249,11 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
   
   t_seq = seq(min(TimeSplits), max(TimeSplits), by = 0.01)
   n_points = length(t_seq)
-  
+
+  # The node-selection variance, if the trajectory has bootstrap conditional
+  # means (getEstimatedTrajectories_Full()); zero otherwise
+  selection_var = trajSelectionVariance(EstTraj, t_seq)
+
   isInInterval = function(i){
     
     t = t_seq[i]
@@ -267,7 +271,7 @@ coverageRateTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, CL = 0.95){
     for(j in 1:n_models){
       
       # Confidence interval: the trajectories are not observed, so no noise term is added
-      cur_y_var = (t(trans_mat) %*% Cov[[cur_est_traj_index]][1:4 + (j-1)*4, 1:4 + (j-1)*4] %*% trans_mat)[1,1]
+      cur_y_var = (t(trans_mat) %*% Cov[[cur_est_traj_index]][1:4 + (j-1)*4, 1:4 + (j-1)*4] %*% trans_mat)[1,1] + selection_var[i, j]
       upper = est_traj[j] + stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       lower = est_traj[j] - stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       
@@ -434,24 +438,12 @@ avgCIWidthTraj = function(EstTraj, CL = 0.95, t_grid_size = 0.01){
   }
 
   TimeSplits = EstTraj$TimeSplits
-  n_regions = length(TimeSplits) - 1
   n_models = nrow(EstTraj$Traj[[1]])
   t_seq = seq(min(TimeSplits), max(TimeSplits), by = t_grid_size)
 
-  # Same region rule as the other evaluation functions
-  idx = pmin(pmax(findInterval(t_seq, TimeSplits, left.open = TRUE), 1), n_regions)
-  s = t_seq - TimeSplits[idx]
-  B = cbind(s^3, s^2, s, 1)
-  variance = matrix(0, length(t_seq), n_models)
-
-  for(r in unique(idx)){
-    sel = idx == r
-    Bs = B[sel, , drop = FALSE]
-    for(m in seq_len(n_models)){
-      block = EstTraj$Cov[[r]][1:4 + (m - 1)*4, 1:4 + (m - 1)*4]
-      variance[sel, m] = rowSums((Bs %*% block) * Bs)
-    }
-  }
+  # OneShot's variance, plus the node-selection variance if the trajectory has
+  # bootstrap conditional means (getEstimatedTrajectories_Full())
+  variance = trajWithinVariance(EstTraj, t_seq) + trajSelectionVariance(EstTraj, t_seq)
 
   z = stats::qnorm((1 + CL)/2)
   width = colMeans(2*z*sqrt(pmax(variance, 0)))

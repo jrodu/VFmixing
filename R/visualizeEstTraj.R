@@ -61,6 +61,8 @@ visualizeEstTraj = function(EstTraj, TrueTraj, TrueTrajTimeSplits, EstPath, base
       trans_mat = matrix(rep(c(cur_difft^3,cur_difft^2,cur_difft,1), n_models), nrow = 4)
       
       cur_y_var = apply(matrix(1:n_models), MARGIN = 1, FUN = function(x){(t(trans_mat) %*% Cov[[cur_traj_index]][1:4 + (x-1)*4, 1:4 + (x-1)*4] %*% trans_mat)[1,1]})
+      # Plus the node-selection variance, if the trajectory has bootstrap conditional means
+      cur_y_var = cur_y_var + c(trajSelectionVariance(EstTraj, t))
       
       upper = cur_traj + stats::qnorm((1+CL)/2)*sqrt(cur_y_var)
       lower = cur_traj - stats::qnorm((1+CL)/2)*sqrt(cur_y_var)

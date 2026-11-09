@@ -98,25 +98,42 @@ test_that("the bootstrap adds the selection variance to OneShot's covariance", {
   set.seed(3)
   fit = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE, B = 4, quiet = TRUE)
 
-  # same estimates, more variance
+  # same estimates and OneShot covariance, plus the conditional means
   expect_equal(fit$EstTraj$Traj, base$EstTraj$Traj)
+  expect_equal(fit$EstTraj$Cov, base$EstTraj$Cov)
   expect_equal(fit$Variance$Within, base$EstTraj$Cov)
-  expect_equal(fit$EstTraj$Cov, mapply(`+`, fit$Variance$Within, fit$Variance$Selection, SIMPLIFY = FALSE))
-  expect_equal(fit$Variance$Total, fit$EstTraj$Cov)
-  expect_true(all(vapply(fit$Variance$Selection, function(S){min(eigen(S, symmetric = TRUE, only.values = TRUE)$values)}, 1) > -1e-10))
+  expect_length(fit$EstTraj$SelectionMeans, 4)
+  expect_named(fit$EstTraj$SelectionMeans[[1]], c("Traj", "TimeSplits"))
 
   pw = fit$Variance$Pointwise
   expect_named(pw, c("t", "trajectory", "var_within", "var_selection", "var_total", "selection_share"))
   expect_equal(pw$var_total, pw$var_within + pw$var_selection)
+  expect_true(all(pw$var_selection >= 0))
   expect_true(all(pw$selection_share >= 0 & pw$selection_share <= 1))
+
+  # the selection variance is the sample variance (divisor B - 1) of the
+  # conditional means at each time, with no projection
+  t0 = 2.37
+  m = vapply(fit$EstTraj$SelectionMeans, function(x){evaluateTrajAt(t0, x)[1, 1]}, 1)
+  expect_equal(trajSelectionVariance(fit$EstTraj, t0)[1, 1], sum((m - mean(m))^2)/(length(m) - 1))
 
   expect_equal(fit$Bootstrap$B, 4)
   expect_equal(fit$Bootstrap$Successful, 4)
   expect_length(fit$Bootstrap$Nodes, 4)
   expect_named(fit$Bootstrap$Nodes[[1]], c("Path", "Traj"))
 
-  # the existing interval functions use the total covariance
-  expect_true(all(avgCIWidthTraj(fit$EstTraj) >= avgCIWidthTraj(base$EstTraj)))
+  # the residuals are scaled to variance RSS/(n - p)
+  p = splineFreeParams(length(fit$EstPath$Path), FALSE)
+  expect_equal(fit$Bootstrap$ResidualScale, sqrt(nrow(d)/(nrow(d) - p)))
+
+  # the interval functions add the selection variance, and drop it without the means
+  expect_true(all(avgCIWidthTraj(fit$EstTraj) > avgCIWidthTraj(base$EstTraj)))
+  within = fit$EstTraj
+  within$SelectionMeans = NULL
+  expect_equal(avgCIWidthTraj(within), avgCIWidthTraj(base$EstTraj))
+  truth = list(Traj = list(matrix(c(0, 0, 0, 0.5, 0, 0, 0, 0.5), 2, 4, byrow = TRUE)), TimeSplits = c(0, 6))
+  expect_true(all(coverageRateTraj(fit$EstTraj, truth$Traj, truth$TimeSplits) >=
+                    coverageRateTraj(base$EstTraj, truth$Traj, truth$TimeSplits)))
 })
 
 test_that("refining splits every selected trajectory region evenly", {
@@ -146,7 +163,7 @@ test_that("the full method refines the trajectory, in the bootstrap replicates t
                                       bootstrap = TRUE, B = 3, quiet = TRUE)
 
   expect_equal(fit$EstTraj$TimeSplits, refineTimeSplits(base$EstTraj$TimeSplits, 2))
-  expect_length(fit$Variance$Selection, length(fit$EstTraj$Traj))
+  expect_length(fit$EstTraj$SelectionMeans, 3)
   for(nodes in fit$Bootstrap$Nodes){
     # every replicate's trajectory regions come in refined pairs of equal length
     w = diff(nodes$Traj)
