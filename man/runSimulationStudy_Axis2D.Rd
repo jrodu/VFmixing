@@ -113,7 +113,10 @@ the law of total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstima
 \item \code{"2x BIC + refine + bootstrap"}: \code{"2x BIC + bootstrap"}, with every selected
 trajectory region split in two (twice \code{traj_refine}), in the bootstrap
 replicates too. This shows what the extra trajectory regions buy where the
-remaining bias comes from trajectory nodes that miss the true ones.
+remaining bias comes from trajectory nodes that miss the true ones. It
+reuses the bootstrap of \code{"2x BIC + bootstrap"} (the same node selections,
+refit on the split regions with \code{\link[=refineEstimatedTrajectories_Full]{refineEstimatedTrajectories_Full()}}), so
+it adds little time.
 }
 
 \strong{Metrics.} For each setting and variant:
@@ -132,7 +135,9 @@ confidence intervals, per trajectory.
 the same with OneShot's covariance alone (without the selection part).
 \item \code{selection_share}: for the bootstrap variants, the average share of the
 trajectory variance that comes from the node selection.
-\item \code{time_total}: elapsed seconds for the fit (including the bootstrap).
+\item \code{time_total}: elapsed seconds for the fit (including the bootstrap). The two
+bootstrap variants share one bootstrap, so the refined variant only adds
+fixed-node refits; each one's time is what it would take on its own.
 }
 
 If a fit fails, its metrics are \code{NA} and the error message is recorded.

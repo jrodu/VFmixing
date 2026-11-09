@@ -37,7 +37,10 @@
 #' * `"2x BIC + refine + bootstrap"`: `"2x BIC + bootstrap"`, with every selected
 #'   trajectory region split in two (twice `traj_refine`), in the bootstrap
 #'   replicates too. This shows what the extra trajectory regions buy where the
-#'   remaining bias comes from trajectory nodes that miss the true ones.
+#'   remaining bias comes from trajectory nodes that miss the true ones. It
+#'   reuses the bootstrap of `"2x BIC + bootstrap"` (the same node selections,
+#'   refit on the split regions with [refineEstimatedTrajectories_Full()]), so
+#'   it adds little time.
 #'
 #' **Metrics.** For each setting and variant:
 #' * `path_rmse`: root mean squared distance between the estimated and true
@@ -54,7 +57,9 @@
 #'   the same with OneShot's covariance alone (without the selection part).
 #' * `selection_share`: for the bootstrap variants, the average share of the
 #'   trajectory variance that comes from the node selection.
-#' * `time_total`: elapsed seconds for the fit (including the bootstrap).
+#' * `time_total`: elapsed seconds for the fit (including the bootstrap). The two
+#'   bootstrap variants share one bootstrap, so the refined variant only adds
+#'   fixed-node refits; each one's time is what it would take on its own.
 #'
 #' If a fit fails, its metrics are `NA` and the error message is recorded.
 #'
@@ -208,7 +213,7 @@ runSimulationStudy_Axis2D = function(seed,
   #   OneShot's variance (getEstimatedTrajectories_Full()).
   # * "2x BIC + refine + bootstrap": "2x BIC + bootstrap" with each selected
   #   trajectory region split in two.
-  fitVariant = function(variant, sim, fitFields, extra = list()){
+  fitVariant = function(variant, sim, fitFields, extra = list(), boot_cache = new.env()){
 
     SimData = sim$SimData
     TrueData = sim$TrueData
@@ -221,15 +226,27 @@ runSimulationStudy_Axis2D = function(seed,
     Variance = NULL
     error = NA_character_
     time_total = NA_real_
+    reused = FALSE
 
     tryCatch({
 
       t0 = Sys.time()
 
       if(variant %in% bootstrap_variants){
-        fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
-                                                       patience = patience, undersmooth = TRUE, traj_refine = if(variant == "2x BIC + refine + bootstrap") 2*traj_refine else traj_refine,
-                                                       bootstrap = TRUE, B = B, quiet = TRUE))
+        # The bootstrap variants share one bootstrap: the refined variant reuses
+        # its node selections and only refits (refineEstimatedTrajectories_Full())
+        reused = !is.null(boot_cache$fit)
+        if(!reused){
+          t_base = Sys.time()
+          boot_cache$fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
+                                                                    patience = patience, undersmooth = TRUE, traj_refine = traj_refine,
+                                                                    bootstrap = TRUE, B = B, quiet = TRUE))
+          boot_cache$time = as.numeric(difftime(Sys.time(), t_base, units = "secs"))
+        }
+        fit = boot_cache$fit
+        if(variant == "2x BIC + refine + bootstrap"){
+          fit = refineEstimatedTrajectories_Full(fit, SimData, fitFields, refine = 2)
+        }
         EstPath = fit$EstPath
         EstTraj = fit$EstTraj
         Variance = fit$Variance
@@ -242,6 +259,11 @@ runSimulationStudy_Axis2D = function(seed,
       }
 
       time_total = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+      # The time each bootstrap variant would take on its own
+      if(reused){
+        time_total = time_total + boot_cache$time
+      }
 
     }, error = function(e){
       error <<- conditionMessage(e)
@@ -331,10 +353,11 @@ runSimulationStudy_Axis2D = function(seed,
   for(i in seq_len(nrow(settings))){
 
     fits[[settings$name[i]]] = list()
+    boot_cache = new.env()   # shared by the bootstrap variants of this setting
 
     for(variant in variants){
 
-      fit = fitVariant(variant, sim_data[[i]], vectorFields)
+      fit = fitVariant(variant, sim_data[[i]], vectorFields, boot_cache = boot_cache)
       say("fit ", length(results) + 1, "/", nrow(settings)*length(variants), ": ", settings$name[i], ", ", variant,
           sprintf(" (%.1f s)", fit$metrics$time_total),
           if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))

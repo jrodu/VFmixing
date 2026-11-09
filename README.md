@@ -197,7 +197,9 @@ trajectory can be split further than the path supports: `refine = 2`
 splits every selected trajectory region in half and refits
 (`traj_refine` in `getEstimatedTrajectories_Full()`). It’s a heuristic
 that reduces the bias left by misplaced nodes, at the cost of wider
-intervals.
+intervals. Because refining happens after the node search,
+`refineEstimatedTrajectories_Full()` can refine an existing full-method
+fit, bootstrap included, without searching again.
 
 ``` r
 TrajTime <- system.time(
@@ -379,8 +381,8 @@ run can be stopped and resumed, or split across machines by seed.
 | Study | Vector fields | Settings | Variants |
 |----|----|----|----|
 | `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
-| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap |
-| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap |
+| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
+| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
 | `runSimulationStudy_Collinearity2D()` | x-axis and a field at a random angle | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_ErrorProcess2D()` | rotation and expansion, noisy velocity at a random SNR | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Misspecification2D()` | data from rotation and expansion, fit with scaled versions | low error, medium complexity | 2x BIC + bootstrap |

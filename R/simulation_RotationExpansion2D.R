@@ -33,8 +33,13 @@
 #' * `"2x BIC path only"`: twice BIC's path regions, BIC's trajectory regions.
 #' * `"2x BIC"`: twice BIC's regions for both (the default undersmoothing).
 #' * `"2x BIC + bootstrap"`: `"2x BIC"`, with the node-selection variance from
-#'   `B` bootstrap replicates added to OneShot's variance at each time, through the law of
-#'   total variance ([getEstimatedTrajectories_Full()]).
+#'   `B` bootstrap replicates added to OneShot's variance at each time, through
+#'   the law of total variance ([getEstimatedTrajectories_Full()]).
+#' * `"2x BIC + refine + bootstrap"`: `"2x BIC + bootstrap"`, with every selected
+#'   trajectory region split in two (twice `traj_refine`), in the bootstrap
+#'   replicates too. It reuses the bootstrap of `"2x BIC + bootstrap"` (the same
+#'   node selections, refit on the split regions with
+#'   [refineEstimatedTrajectories_Full()]), so it adds little time.
 #'
 #' **Metrics.** For each setting and variant:
 #' * `path_rmse`: root mean squared distance between the estimated and true
@@ -47,11 +52,13 @@
 #'   confidence intervals, per trajectory.
 #' * `path_width_*`: [avgCIWidthPath()] with prediction intervals, per dimension.
 #' * `traj_width_*`: [avgCIWidthTraj()], per trajectory.
-#' * `traj_coverage_within_*`, `traj_width_within_*`: for `"2x BIC + bootstrap"`,
+#' * `traj_coverage_within_*`, `traj_width_within_*`: for the bootstrap variants,
 #'   the same with OneShot's covariance alone (without the selection part).
-#' * `selection_share`: for `"2x BIC + bootstrap"`, the average share of the
+#' * `selection_share`: for the bootstrap variants, the average share of the
 #'   trajectory variance that comes from the node selection.
-#' * `time_total`: elapsed seconds for the fit (including the bootstrap).
+#' * `time_total`: elapsed seconds for the fit (including the bootstrap). The two
+#'   bootstrap variants share one bootstrap, so the refined variant only adds
+#'   fixed-node refits; each one's time is what it would take on its own.
 #'
 #' If a fit fails, its metrics are `NA` and the error message is recorded.
 #'
@@ -59,7 +66,7 @@
 #' @param error_sd a named numeric vector. The positional error standard deviations, named by level.
 #' @param n_regions a named numeric vector. The number of regions in the true trajectories, named by complexity level.
 #' @param variants a character vector of variants. See Details.
-#' @param B a whole number of at least 2. The number of bootstrap replicates for `"2x BIC + bootstrap"`.
+#' @param B a whole number of at least 2. The number of bootstrap replicates for the bootstrap variants.
 #' @param traj_refine a positive whole number. Each selected trajectory region is split into this many equal regions
 #' and refit (see [getEstimatedTrajectories_OneShot()]). The default, 1, keeps the selected regions.
 #' @param patience NULL or a positive integer. Passed to every path and trajectory search.
@@ -102,7 +109,7 @@
 runSimulationStudy_RotationExpansion2D = function(seed,
                                      error_sd = c(low = 0.001, med = 0.01, high = 0.1),
                                      n_regions = c(low = 2, med = 10, high = 50),
-                                     variants = "2x BIC + bootstrap", B = 20, traj_refine = 1,
+                                     variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"), B = 20, traj_refine = 1,
                                      patience = 10, t_end = 20, t_step = 0.01,
                                      path_nsplits = NULL, traj_nsplits = 300, CL = 0.95,
                                      sigma = 0.5, k = 0.5, start_range = c(-100, 100),
@@ -137,15 +144,18 @@ runSimulationStudy_RotationExpansion2D = function(seed,
     stop("n_regions must be a named vector of positive whole numbers.", call. = FALSE)
   }
 
-  if(length(variants) < 1 || anyDuplicated(variants) || !all(variants %in% c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"))){
-    stop("variants must be distinct values from \"BIC\", \"2x BIC path only\", \"2x BIC\" and \"2x BIC + bootstrap\".", call. = FALSE)
+  all_variants = c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap", "2x BIC + refine + bootstrap")
+  bootstrap_variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap")
+
+  if(length(variants) < 1 || anyDuplicated(variants) || !all(variants %in% all_variants)){
+    stop("variants must be distinct values from ", paste0("\"", all_variants, "\"", collapse = ", "), ".", call. = FALSE)
   }
 
   if(length(traj_refine) != 1 || !is.numeric(traj_refine) || traj_refine < 1 || traj_refine != round(traj_refine)){
     stop("traj_refine must be a positive whole number.", call. = FALSE)
   }
 
-  if("2x BIC + bootstrap" %in% variants && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
+  if(any(bootstrap_variants %in% variants) && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
     stop("B must be a whole number of at least 2.", call. = FALSE)
   }
 
@@ -204,8 +214,10 @@ runSimulationStudy_RotationExpansion2D = function(seed,
   # * "2x BIC path only": twice BIC's path regions, BIC's trajectory regions.
   # * "2x BIC": twice BIC's regions for both.
   # * "2x BIC + bootstrap": "2x BIC", with the node-selection variance added to
-  #   OneShot's covariance (getEstimatedTrajectories_Full()).
-  fitVariant = function(variant, sim, fitFields, extra = list()){
+  #   OneShot's variance (getEstimatedTrajectories_Full()).
+  # * "2x BIC + refine + bootstrap": "2x BIC + bootstrap" with each selected
+  #   trajectory region split in two.
+  fitVariant = function(variant, sim, fitFields, extra = list(), boot_cache = new.env()){
 
     SimData = sim$SimData
     TrueData = sim$TrueData
@@ -218,15 +230,27 @@ runSimulationStudy_RotationExpansion2D = function(seed,
     Variance = NULL
     error = NA_character_
     time_total = NA_real_
+    reused = FALSE
 
     tryCatch({
 
       t0 = Sys.time()
 
-      if(variant == "2x BIC + bootstrap"){
-        fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
-                                                       patience = patience, undersmooth = TRUE, traj_refine = traj_refine,
-                                                       bootstrap = TRUE, B = B, quiet = TRUE))
+      if(variant %in% bootstrap_variants){
+        # The bootstrap variants share one bootstrap: the refined variant reuses
+        # its node selections and only refits (refineEstimatedTrajectories_Full())
+        reused = !is.null(boot_cache$fit)
+        if(!reused){
+          t_base = Sys.time()
+          boot_cache$fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
+                                                                    patience = patience, undersmooth = TRUE, traj_refine = traj_refine,
+                                                                    bootstrap = TRUE, B = B, quiet = TRUE))
+          boot_cache$time = as.numeric(difftime(Sys.time(), t_base, units = "secs"))
+        }
+        fit = boot_cache$fit
+        if(variant == "2x BIC + refine + bootstrap"){
+          fit = refineEstimatedTrajectories_Full(fit, SimData, fitFields, refine = 2)
+        }
         EstPath = fit$EstPath
         EstTraj = fit$EstTraj
         Variance = fit$Variance
@@ -239,6 +263,11 @@ runSimulationStudy_RotationExpansion2D = function(seed,
       }
 
       time_total = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+
+      # The time each bootstrap variant would take on its own
+      if(reused){
+        time_total = time_total + boot_cache$time
+      }
 
     }, error = function(e){
       error <<- conditionMessage(e)
@@ -328,10 +357,11 @@ runSimulationStudy_RotationExpansion2D = function(seed,
   for(i in seq_len(nrow(settings))){
 
     fits[[settings$name[i]]] = list()
+    boot_cache = new.env()   # shared by the bootstrap variants of this setting
 
     for(variant in variants){
 
-      fit = fitVariant(variant, sim_data[[i]], vectorFields)
+      fit = fitVariant(variant, sim_data[[i]], vectorFields, boot_cache = boot_cache)
       say("fit ", length(results) + 1, "/", nrow(settings)*length(variants), ": ", settings$name[i], ", ", variant,
           sprintf(" (%.1f s)", fit$metrics$time_total),
           if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))

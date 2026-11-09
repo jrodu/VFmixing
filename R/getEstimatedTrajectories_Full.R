@@ -225,6 +225,84 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
 
 }
 
+#' Refine the Trajectories of a Full-Method Fit
+#'
+#' @description
+#' Splits every trajectory region of a [getEstimatedTrajectories_Full()] fit
+#' into `refine` equal regions and refits, reusing the fit's node selections
+#' instead of searching again. With a bootstrap, every replicate's conditional
+#' mean is refit on its own refined trajectory nodes too, so the result keeps
+#' the node-selection variance.
+#'
+#' @details
+#' Refinement happens after node selection, so every node search (on the data
+#' and in each bootstrap replicate) would select the same nodes with or without
+#' it. This gives the same result as rerunning [getEstimatedTrajectories_Full()]
+#' with `traj_refine` multiplied by `refine` on the same bootstrap replicates,
+#' at the cost of fixed-node refits only. Comparing a fit with its refined
+#' version is also a paired comparison: both use the same replicates.
+#'
+#' @param fit a list returned by [getEstimatedTrajectories_Full()].
+#' @param Data the data the fit was made from.
+#' @param baseVectorFields the baseVectorField function the fit was made with.
+#' @param refine a positive whole number. Each trajectory region is split into this many equal regions.
+#' @param V_Smooth,quad_nodes,t_grid_size the values the fit was made with (the defaults match those of
+#' [getEstimatedTrajectories_Full()]).
+#'
+#' @returns a list like that of [getEstimatedTrajectories_Full()], with the refined trajectories.
+#' @export
+#'
+#' @examples
+#' \donttest{
+#' set.seed(1)
+#' fit = getEstimatedTrajectories_Full(ExData, baseVectorFields, traj_nsplits = 50,
+#'                                     bootstrap = TRUE, B = 10, quiet = TRUE)
+#' refined = refineEstimatedTrajectories_Full(fit, ExData, baseVectorFields, refine = 2)
+#' length(fit$EstTraj$Traj)
+#' length(refined$EstTraj$Traj)
+#' }
+#'
+refineEstimatedTrajectories_Full = function(fit, Data, baseVectorFields, refine = 2, V_Smooth = F, quad_nodes = 20,
+                                            t_grid_size = 0.01){
+
+  checkRefine(refine)
+
+  if(refine == 1){
+    return(fit)
+  }
+
+  Data = data.frame(Data)
+  names(Data) = c("t", stringr::str_c("X", seq_len(ncol(Data) - 1)))
+
+  EstTraj = oneShotFixedNodes(fit$EstPath, refineTimeSplits(fit$EstTraj$TimeSplits, refine), baseVectorFields, V_Smooth, quad_nodes)
+
+  if(is.null(fit$Bootstrap)){
+    return(list(EstPath = fit$EstPath, EstTraj = EstTraj, Variance = NULL, Bootstrap = NULL))
+  }
+
+  # Each replicate's conditional mean on its own refined trajectory nodes, with
+  # its path nodes fit to the noise-free fitted positions as before
+  Data_fit = Data
+  Data_fit[, -1] = getEstPathPosition(Data$t, fit$EstPath)
+
+  nodes = lapply(fit$Bootstrap$Nodes, function(n){list(Path = n$Path, Traj = refineTimeSplits(n$Traj, refine))})
+
+  EstTraj$SelectionMeans = lapply(nodes, function(n){
+    EstPath_m = runEstPathStep_FullRegression(Data_fit, n$Path, V_Smooth = V_Smooth)
+    cond_traj = oneShotFixedNodes(EstPath_m, n$Traj, baseVectorFields, V_Smooth, quad_nodes)
+    list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits)
+  })
+
+  Bootstrap = fit$Bootstrap
+  Bootstrap$Nodes = nodes
+
+  list(EstPath = fit$EstPath,
+       EstTraj = EstTraj,
+       Variance = list(Within = EstTraj$Cov, Pointwise = pointwiseTrajVariance(EstTraj, t_grid_size)),
+       Bootstrap = Bootstrap)
+
+}
+
 # OneShot trajectory with fixed nodes (no node search) on a given path.
 oneShotFixedNodes = function(EstPath, TimeSplits, baseVectorFields, V_Smooth = F, quad_nodes = 20){
 

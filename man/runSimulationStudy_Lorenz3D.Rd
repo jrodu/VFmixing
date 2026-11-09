@@ -8,7 +8,7 @@ runSimulationStudy_Lorenz3D(
   seed,
   error_sd = c(low = 0.001, med = 0.01, high = 0.1),
   n_regions = c(low = 2, med = 10, high = 50),
-  variants = "2x BIC + bootstrap",
+  variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"),
   B = 20,
   traj_refine = 1,
   patience = 10,
@@ -34,7 +34,7 @@ runSimulationStudy_Lorenz3D(
 
 \item{variants}{a character vector of variants. See Details.}
 
-\item{B}{a whole number of at least 2. The number of bootstrap replicates for \code{"2x BIC + bootstrap"}.}
+\item{B}{a whole number of at least 2. The number of bootstrap replicates for the bootstrap variants.}
 
 \item{traj_refine}{a positive whole number. Each selected trajectory region is split into this many equal regions
 and refit (see \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}). The default, 1, keeps the selected regions.}
@@ -117,8 +117,13 @@ is one of:
 \item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
 \item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
 \item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
-\code{B} bootstrap replicates added to OneShot's variance at each time, through the law of
-total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+\code{B} bootstrap replicates added to OneShot's variance at each time, through
+the law of total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+\item \code{"2x BIC + refine + bootstrap"}: \code{"2x BIC + bootstrap"}, with every selected
+trajectory region split in two (twice \code{traj_refine}), in the bootstrap
+replicates too. It reuses the bootstrap of \code{"2x BIC + bootstrap"} (the same
+node selections, refit on the split regions with
+\code{\link[=refineEstimatedTrajectories_Full]{refineEstimatedTrajectories_Full()}}), so it adds little time.
 }
 
 \strong{Metrics.} For each setting and variant:
@@ -133,11 +138,13 @@ intervals, per dimension.
 confidence intervals, per trajectory.
 \item \verb{path_width_*}: \code{\link[=avgCIWidthPath]{avgCIWidthPath()}} with prediction intervals, per dimension.
 \item \verb{traj_width_*}: \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}}, per trajectory.
-\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for \code{"2x BIC + bootstrap"},
+\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for the bootstrap variants,
 the same with OneShot's covariance alone (without the selection part).
-\item \code{selection_share}: for \code{"2x BIC + bootstrap"}, the average share of the
+\item \code{selection_share}: for the bootstrap variants, the average share of the
 trajectory variance that comes from the node selection.
-\item \code{time_total}: elapsed seconds for the fit (including the bootstrap).
+\item \code{time_total}: elapsed seconds for the fit (including the bootstrap). The two
+bootstrap variants share one bootstrap, so the refined variant only adds
+fixed-node refits; each one's time is what it would take on its own.
 }
 
 If a fit fails, its metrics are \code{NA} and the error message is recorded.

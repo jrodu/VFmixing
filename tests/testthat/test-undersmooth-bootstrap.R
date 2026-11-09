@@ -180,3 +180,25 @@ test_that("the full method checks its arguments", {
   expect_error(getEstimatedTrajectories_Full(d, axisFields, bootstrap = TRUE, B = 1), "B must")
   expect_error(getEstimatedTrajectories_Full(d, axisFields, patience = 0), "patience")
 })
+
+test_that("refining a full fit matches refitting with traj_refine, without new searches", {
+  d = axisData()
+  set.seed(11)
+  fit = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE, B = 3, quiet = TRUE)
+  set.seed(11)
+  direct = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, traj_refine = 2,
+                                         bootstrap = TRUE, B = 3, quiet = TRUE)
+  refined = refineEstimatedTrajectories_Full(fit, d, axisFields, refine = 2)
+
+  expect_equal(refined$EstTraj$Traj, direct$EstTraj$Traj)
+  expect_equal(refined$EstTraj$Cov, direct$EstTraj$Cov)
+  expect_equal(refined$EstTraj$SelectionMeans, direct$EstTraj$SelectionMeans)
+  expect_equal(refined$Variance$Pointwise, direct$Variance$Pointwise)
+  expect_equal(refined$Bootstrap$Nodes, direct$Bootstrap$Nodes)
+
+  # without a bootstrap, and with refine = 1
+  plain = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, quiet = TRUE)
+  expect_length(refineEstimatedTrajectories_Full(plain, d, axisFields, refine = 2)$EstTraj$Traj, 2*length(plain$EstTraj$Traj))
+  expect_identical(refineEstimatedTrajectories_Full(fit, d, axisFields, refine = 1), fit)
+  expect_error(refineEstimatedTrajectories_Full(fit, d, axisFields, refine = 0), "refine")
+})
