@@ -100,6 +100,15 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' relative to their standard errors. See [getEstimatedTrajectories_Full()] for
 #' intervals that also account for the node selection.
 #'
+#' With `refine` greater than 1, every region of the selected trajectory is then
+#' split into `refine` equal pieces and the trajectories are refit on those
+#' nodes (without another search). This is a heuristic for data with low
+#' positional error and complex trajectories: the path can only support so many
+#' regions, but the trajectory nodes found by the search can still sit away from
+#' the places where the true trajectories change, and the finer regions let the
+#' spline follow those changes. It reduces the bias at the cost of wider
+#' intervals. The refined trajectory can have more than `nsplits` regions.
+#'
 #' @param EstPath an EstimatedPath object.
 #' @param nsplits a numeric scalar. The maximum number of splits the spline can split into.
 #' @param baseVectorFields a baseVectorField object.
@@ -114,6 +123,8 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' Otherwise, stop after this many consecutive candidates without improving the criterion. See Details.
 #' @param undersmooth a boolean. If TRUE (the default), return the candidate with twice as many regions as the
 #' criterion's choice. See Details.
+#' @param refine a positive whole number. Each region of the selected trajectory is split into this many equal
+#' regions and refit. The default, 1, keeps the selected regions. See Details.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -131,7 +142,7 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #'      EstPath = ExEstPath_FullFours,
 #'      nsplits = 100, baseVectorFields = baseVectorFields, patience = 10)
 #'
-getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL, undersmooth = T){
+getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL, undersmooth = T, refine = 1){
 
   Model_Selection_Type = checkTrajSelectionType(Model_Selection_Type)
 
@@ -140,6 +151,7 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   }
 
   checkPatience(patience)
+  checkRefine(refine)
 
   svMisc::progress(0, max.value = nsplits, progress.bar = T, console = T)
 
@@ -222,10 +234,39 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
 
   if(!is.null(patience)){
     # The candidates were already scored while searching.
-    return(selectBestTraj(all_splits_est_traj, tracker$values(), undersmooth = undersmooth, best_index = tracker$best_index()))
+    best = selectBestTraj(all_splits_est_traj, tracker$values(), undersmooth = undersmooth, best_index = tracker$best_index())
+  } else{
+    best = getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth,
+                             undersmooth = undersmooth)
   }
 
-  getBestSplitsTraj(EstTrajList = all_splits_est_traj, EstPath = EstPath, show = F, type = Model_Selection_Type, V_Smooth = V_Smooth,
-                    undersmooth = undersmooth)
+  if(refine > 1){
+    best = oneShotFixedNodes(EstPath, refineTimeSplits(best$TimeSplits, refine), baseVectorFields, V_Smooth, quad_nodes)
+    print(stringr::str_c("Refined to ", length(best$Traj), " regions."))
+  }
 
+  best
+
+}
+
+# Validate a refine argument: a positive whole number.
+checkRefine = function(refine){
+
+  if(length(refine) != 1 || !is.numeric(refine) || refine < 1 || refine != round(refine)){
+    stop("refine must be a positive whole number.", call. = FALSE)
+  }
+
+  invisible(refine)
+}
+
+# Split every region into `refine` equal regions.
+refineTimeSplits = function(TimeSplits, refine){
+
+  n_regions = length(TimeSplits) - 1
+
+  starts = unlist(lapply(seq_len(n_regions), function(r){
+    seq(TimeSplits[r], TimeSplits[r + 1], length.out = refine + 1)[seq_len(refine)]
+  }))
+
+  c(starts, TimeSplits[n_regions + 1])
 }

@@ -14,6 +14,15 @@
 #' bias of the path's velocity and of the trajectory spline, so the trajectory
 #' intervals are centred closer to the truth. See [getEstimatedPaths_FullFours()].
 #'
+#' **Refining the trajectory (`traj_refine`).** With low positional error and
+#' complex trajectories, most of the remaining bias comes from trajectory nodes
+#' that sit away from where the true trajectories change. The path can only
+#' support so many regions, but the trajectory can be split further: each
+#' selected trajectory region is split into `traj_refine` equal regions and refit
+#' (see the `refine` argument of [getEstimatedTrajectories_OneShot()]). This is a
+#' heuristic that trades wider intervals for less bias. In the bootstrap, every
+#' replicate's trajectory is refined the same way.
+#'
 #' **Bootstrap (`bootstrap`).** OneShot's covariance treats the selected nodes as
 #' fixed. The nodes are chosen from the data, so they vary from data set to data
 #' set, and that variability is missing from it. By the law of total variance,
@@ -52,6 +61,8 @@
 #' @param Model_Selection_Type a string. The criterion for both node searches, "BIC" or "AIC".
 #' @param patience NULL or a positive integer. Passed to both node searches.
 #' @param undersmooth a boolean. If TRUE (the default), both node searches use twice the selected number of regions. See Details.
+#' @param traj_refine a positive whole number. Each selected trajectory region is split into this many equal
+#' regions and refit. The default, 1, keeps the selected regions. See Details.
 #' @param bootstrap a boolean. If TRUE, add the node-selection variance to the trajectory covariance. See Details. Default FALSE.
 #' @param B a positive integer. The number of bootstrap replicates.
 #' @param quad_nodes a positive integer. Passed to [getEstimatedTrajectories_OneShot()].
@@ -82,7 +93,7 @@
 #'
 getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = NULL, traj_nsplits = 100,
                                          path_method = "FullFours", V_Smooth = F, Model_Selection_Type = "BIC",
-                                         patience = 10, undersmooth = T, bootstrap = F, B = 20,
+                                         patience = 10, undersmooth = T, traj_refine = 1, bootstrap = F, B = 20,
                                          quad_nodes = 20, t_grid_size = 0.01, quiet = F){
 
   if(!(path_method %in% c("FullFours", "FullRegression", "Projection"))){
@@ -95,6 +106,7 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   }
 
   checkPatience(patience)
+  checkRefine(traj_refine)
 
   if(bootstrap && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
     stop("B must be a whole number of at least 2.", call. = FALSE)
@@ -131,7 +143,7 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   fitTraj = function(EstPath){
     getEstimatedTrajectories_OneShot(EstPath, nsplits = traj_nsplits, baseVectorFields = baseVectorFields, V_Smooth = V_Smooth,
                                      Model_Selection_Type = Model_Selection_Type, quad_nodes = quad_nodes,
-                                     patience = patience, undersmooth = undersmooth)
+                                     patience = patience, undersmooth = undersmooth, refine = traj_refine)
   }
 
   # ---- The fit on the data ---------------------------------------------------

@@ -119,7 +119,44 @@ test_that("the bootstrap adds the selection variance to OneShot's covariance", {
   expect_true(all(avgCIWidthTraj(fit$EstTraj) >= avgCIWidthTraj(base$EstTraj)))
 })
 
+test_that("refining splits every selected trajectory region evenly", {
+  expect_equal(refineTimeSplits(c(0, 1, 3), 2), c(0, 0.5, 1, 2, 3))
+  expect_equal(refineTimeSplits(c(0, 3), 3), c(0, 1, 2, 3))
+  expect_equal(refineTimeSplits(c(0, 1, 3), 1), c(0, 1, 3))
+
+  d = axisData()
+  P = quietly(getEstimatedPaths_FullFours(d, nsplits = 150, patience = 10))
+  a = quietly(getEstimatedTrajectories_OneShot(P, nsplits = 30, baseVectorFields = axisFields, patience = 10))
+  one = quietly(getEstimatedTrajectories_OneShot(P, nsplits = 30, baseVectorFields = axisFields, patience = 10, refine = 1))
+  b = quietly(getEstimatedTrajectories_OneShot(P, nsplits = 30, baseVectorFields = axisFields, patience = 10, refine = 2))
+
+  expect_equal(one$Traj, a$Traj)
+  expect_equal(b$TimeSplits, refineTimeSplits(a$TimeSplits, 2))
+  expect_length(b$Traj, 2*length(a$Traj))
+  expect_length(b$Cov, 2*length(a$Traj))
+  # Finer regions: more variance
+  expect_true(mean(avgCIWidthTraj(b)) > mean(avgCIWidthTraj(a)))
+})
+
+test_that("the full method refines the trajectory, in the bootstrap replicates too", {
+  d = axisData()
+  base = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, quiet = TRUE)
+  set.seed(3)
+  fit = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, traj_refine = 2,
+                                      bootstrap = TRUE, B = 3, quiet = TRUE)
+
+  expect_equal(fit$EstTraj$TimeSplits, refineTimeSplits(base$EstTraj$TimeSplits, 2))
+  expect_length(fit$Variance$Selection, length(fit$EstTraj$Traj))
+  for(nodes in fit$Bootstrap$Nodes){
+    # every replicate's trajectory regions come in refined pairs of equal length
+    w = diff(nodes$Traj)
+    expect_equal(w[c(TRUE, FALSE)], w[c(FALSE, TRUE)])
+  }
+})
+
 test_that("the full method checks its arguments", {
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, traj_refine = 0), "refine")
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, traj_refine = 1.5), "refine")
   d = axisData()
   expect_error(getEstimatedTrajectories_Full(d, axisFields, path_method = "ByFours"), "covariance")
   expect_error(getEstimatedTrajectories_Full(d, axisFields, Model_Selection_Type = "VarPos"), "BIC")
