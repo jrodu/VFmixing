@@ -13,7 +13,8 @@ getEstimatedTrajectories_OneShot(
   Random_Path = F,
   quad_nodes = 20,
   patience = NULL,
-  undersmooth = T
+  undersmooth = T,
+  refine = 1
 )
 }
 \arguments{
@@ -39,6 +40,9 @@ Otherwise, stop after this many consecutive candidates without improving the cri
 
 \item{undersmooth}{a boolean. If TRUE (the default), return the candidate with twice as many regions as the
 criterion's choice. See Details.}
+
+\item{refine}{a positive whole number. Each region of the selected trajectory is split into this many equal
+regions and refit. The default, 1, keeps the selected regions. See Details.}
 }
 \value{
 an EstimatedTrajectory object.
@@ -73,6 +77,15 @@ not line up with the truth's can't follow it exactly; the extra regions let
 it bend between misplaced nodes, which reduces the bias of the estimates
 relative to their standard errors. See \code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}} for
 intervals that also account for the node selection.
+
+With \code{refine} greater than 1, every region of the selected trajectory is then
+split into \code{refine} equal pieces and the trajectories are refit on those
+nodes (without another search). This is a heuristic for data with low
+positional error and complex trajectories: the path can only support so many
+regions, but the trajectory nodes found by the search can still sit away from
+the places where the true trajectories change, and the finer regions let the
+spline follow those changes. It reduces the bias at the cost of wider
+intervals. The refined trajectory can have more than \code{nsplits} regions.
 }
 \examples{
 \donttest{

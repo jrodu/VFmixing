@@ -192,6 +192,13 @@ The trajectory node search undersmooths in the same way by default
 line up with the truth’s can’t follow it exactly; the extra regions let
 it bend between misplaced nodes.
 
+If the positional error is low and the trajectories are complex, the
+trajectory can be split further than the path supports: `refine = 2`
+splits every selected trajectory region in half and refits
+(`traj_refine` in `getEstimatedTrajectories_Full()`). It’s a heuristic
+that reduces the bias left by misplaced nodes, at the cost of wider
+intervals.
+
 ``` r
 TrajTime <- system.time(
   EstTraj <- getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = 100,
