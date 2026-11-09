@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x0000021fb6c98f58>
+#> <bytecode: 0x0000023c8a16fcb8>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -111,7 +111,7 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.36    0.03    0.46
+#>    0.23    0.05    0.28
 ```
 
 Because the “FullFours” path has a covariance structure, the plot can
@@ -211,7 +211,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>    6.21    0.32    6.73
+#>    5.36    0.07    5.46
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -232,7 +232,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.03    0.00    0.05
+#>    0.01    0.00    0.03
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
@@ -287,11 +287,21 @@ through the law of total variance:
 
 $$\mathrm{Var}(\hat\beta) = \underbrace{E[\mathrm{Var}(\hat\beta \mid \text{nodes})]}_{\text{One-Shot's covariance}} + \underbrace{\mathrm{Var}(E[\hat\beta \mid \text{nodes}])}_{\text{node selection}}$$
 
-One-Shot provides the first part exactly. For the second, a residual
-bootstrap reruns both node searches on `B` resampled data sets, then
-fits each replicate’s nodes, without noise, to the fitted path: the
-spread of those fits is the node-selection variance. Because those fits
-have no noise in them, a small `B` (20 by default) is enough.
+One-Shot provides the first part. For the second, a residual bootstrap
+reruns both node searches on `B` resampled data sets, then fits each
+replicate’s nodes, without noise, to the fitted path. Each of those
+fits, $m_b(t)$, is the conditional mean for that replicate’s nodes, and
+the node-selection variance at each time is their sample variance,
+
+$$V_{\text{sel}}(t) = \frac{1}{B - 1}\sum_{b=1}^{B}\big(m_b(t) - \bar m(t)\big)^2,$$
+
+computed pointwise, with no projection onto the original nodes. The
+interval at time $t$ is
+$\hat\beta(t) \pm z\sqrt{s_w^2(t) + V_{\text{sel}}(t)}$, where
+$s_w^2(t)$ comes from One-Shot’s covariance. The residuals are scaled by
+$\sqrt{n/(n - p)}$ before resampling, so the replicates’ noise matches
+the path’s variance estimate. Because the conditional means have no
+noise in them, a small `B` (20 by default) is enough.
 
 ``` r
 set.seed(1)
@@ -307,29 +317,30 @@ The run time, in seconds, with 20 bootstrap replicates:
 ``` r
 FullTime
 #>    user  system elapsed 
-#>    1.78    0.06    1.96
+#>    1.51    0.05    1.59
 ```
 
-The returned trajectory’s `Cov` is the total, so the plotting and
-coverage functions use the full uncertainty. The separate pieces are
-kept in `Fit$Variance`, including the pointwise variances on a time
-grid:
+The returned trajectory keeps One-Shot’s covariance as `Cov` and carries
+the conditional means as `SelectionMeans`, and the plotting, coverage
+and width functions add the selection variance whenever those are
+present. The pointwise pieces on a time grid are in
+`Fit$Variance$Pointwise`:
 
 ``` r
 head(Fit$Variance$Pointwise)
 #>      t trajectory  var_within var_selection   var_total selection_share
-#> 1 0.00          1 0.009726079  1.256212e-05 0.009738641    0.0012899254
-#> 2 0.01          1 0.009121248  1.048822e-05 0.009131737    0.0011485462
-#> 3 0.02          1 0.008547730  8.669058e-06 0.008556400    0.0010131666
-#> 4 0.03          1 0.008004074  7.083549e-06 0.008011158    0.0008842103
-#> 5 0.04          1 0.007488898  5.711781e-06 0.007494610    0.0007621185
-#> 6 0.05          1 0.007000885  4.534970e-06 0.007005420    0.0006473517
+#> 1 0.00          1 0.009726079  1.256324e-05 0.009738642    0.0012900402
+#> 2 0.01          1 0.009121248  1.048787e-05 0.009131736    0.0011485082
+#> 3 0.02          1 0.008547730  8.668036e-06 0.008556398    0.0010130472
+#> 4 0.03          1 0.008004074  7.082385e-06 0.008011157    0.0008840653
+#> 5 0.04          1 0.007488898  5.710805e-06 0.007494609    0.0007619884
+#> 6 0.05          1 0.007000885  4.534353e-06 0.007005419    0.0006472637
 
 # Average share of the trajectory variance that comes from the node selection
 aggregate(selection_share ~ trajectory, data = Fit$Variance$Pointwise, FUN = mean)
 #>   trajectory selection_share
-#> 1          1      0.01041117
-#> 2          2      0.05867149
+#> 1          1      0.04850064
+#> 2          2      0.08263512
 ```
 
 Coverage of the true trajectories with One-Shot’s covariance alone, and
@@ -337,7 +348,7 @@ with the node-selection part added:
 
 ``` r
 OneShotOnly <- Fit$EstTraj
-OneShotOnly$Cov <- Fit$Variance$Within
+OneShotOnly$SelectionMeans <- NULL
 
 coverageRateTraj(OneShotOnly, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
 #> [1] 1 1

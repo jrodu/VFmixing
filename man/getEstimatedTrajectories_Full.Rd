@@ -59,14 +59,13 @@ regions and refit. The default, 1, keeps the selected regions. See Details.}
 a list with:
 \itemize{
 \item \code{EstPath}: the EstimatedPath object.
-\item \code{EstTraj}: the EstimatedTrajectory object. Its \code{Cov} is the total covariance (OneShot's covariance plus the
-selection part if \code{bootstrap}, otherwise OneShot's covariance alone).
-\item \code{Variance}: if \code{bootstrap}, a list with \code{Within} (OneShot's covariance per region), \code{Selection} (the
-selection covariance per region), \code{Total} (their sum) and \code{Pointwise}, a data frame with the time, trajectory,
-and the within, selection and total variances of the trajectory value with the selection share of the total.
-NULL otherwise.
-\item \code{Bootstrap}: if \code{bootstrap}, a list with \code{B}, \code{Successful} (the number of replicates that fit) and \code{Nodes}
-(each replicate's path and trajectory nodes). NULL otherwise.
+\item \code{EstTraj}: the EstimatedTrajectory object, with OneShot's covariance as \code{Cov}. If \code{bootstrap}, it also has
+\code{SelectionMeans}: the conditional means, one per successful replicate (each a list with \code{Traj} and \code{TimeSplits}).
+\item \code{Variance}: if \code{bootstrap}, a list with \code{Within} (OneShot's covariance per region) and \code{Pointwise}, a data
+frame with the time, trajectory, and the within, selection and total variances of the trajectory value with
+the selection share of the total. NULL otherwise.
+\item \code{Bootstrap}: if \code{bootstrap}, a list with \code{B}, \code{Successful} (the number of replicates that fit), \code{Nodes}
+(each replicate's path and trajectory nodes) and \code{ResidualScale} (the residuals' scale factor). NULL otherwise.
 }
 }
 \description{
@@ -100,22 +99,31 @@ The first term is OneShot's covariance (the within-node part). The second
 (the selection part) is estimated with a residual bootstrap:
 \enumerate{
 \item The positions of the fitted path at the data times are taken as the truth,
-with the centred residuals as the noise.
+with the centred residuals as the noise. The residuals are scaled by
+\eqn{\sqrt{n/(n - p)}}, with \eqn{p} the path's free parameters per
+dimension, so the resampled errors have the same variance as the path's
+own estimate, \eqn{RSS/(n - p)}: least-squares residuals are smaller than
+the errors.
 \item For each of \code{B} replicates, the residuals are resampled with replacement
 and added to the fitted positions, and the whole method (both node
 searches) is rerun, giving that replicate's path and trajectory nodes.
 \item The replicate's nodes are then fit, without any noise, to the fitted
-positions. This is the conditional mean \eqn{E[\hat\beta \mid nodes]} for
-those nodes.
-\item The selection part is the variance of those conditional means across
-replicates. They are projected onto the original trajectory's regions
-(a cubic per region, by least squares), so the selection covariance has the
-same form as OneShot's and the two can be added.
+positions. This is the conditional mean \eqn{m_b = E[\hat\beta \mid nodes]}
+for those nodes, a C1 cubic spline on the replicate's own trajectory nodes.
+\item The selection part at each time is the sample variance (divisor
+\eqn{B - 1}) of the conditional means there,
+\eqn{V_{sel}(t) = \frac{1}{B - 1}\sum_b (m_b(t) - \bar m(t))^2}.
+The conditional means are kept as they are, with no projection onto the
+original nodes.
 }
 
-The returned trajectory's \code{Cov} is the total (within + selection), so
-\code{\link[=visualizeEstTraj]{visualizeEstTraj()}}, \code{\link[=coverageRateTraj]{coverageRateTraj()}} and \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}} use the
-total uncertainty. The separate pieces are returned in \code{Variance}.
+The pointwise intervals are then
+\eqn{\hat\beta(t) \pm z \sqrt{s_w^2(t) + V_{sel}(t)}}, with \eqn{s_w^2(t)} the
+within-node variance from OneShot's covariance. The returned trajectory keeps
+OneShot's covariance as \code{Cov} and carries the conditional means as
+\code{SelectionMeans}; \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}, \code{\link[=coverageRateTraj]{coverageRateTraj()}} and
+\code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}} add the selection part whenever \code{SelectionMeans} is
+present. Set it to \code{NULL} for intervals from OneShot's covariance alone.
 
 Because the conditional means are fit without noise, the selection part
 settles with few replicates: 20 is usually plenty. This part still conditions
@@ -128,7 +136,7 @@ set.seed(1)
 fit = getEstimatedTrajectories_Full(ExData, baseVectorFields, traj_nsplits = 50,
                                     bootstrap = TRUE, B = 10, quiet = TRUE)
 head(fit$Variance$Pointwise)
-# Coverage of the true trajectories with the total covariance
+# Coverage of the true trajectories with the total variance
 coverageRateTraj(fit$EstTraj, ExTraj$Traj, ExTraj$TimeSplits)
 }
 

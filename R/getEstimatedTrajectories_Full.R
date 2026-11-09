@@ -30,21 +30,30 @@
 #' The first term is OneShot's covariance (the within-node part). The second
 #' (the selection part) is estimated with a residual bootstrap:
 #' 1. The positions of the fitted path at the data times are taken as the truth,
-#'    with the centred residuals as the noise.
+#'    with the centred residuals as the noise. The residuals are scaled by
+#'    \eqn{\sqrt{n/(n - p)}}, with \eqn{p} the path's free parameters per
+#'    dimension, so the resampled errors have the same variance as the path's
+#'    own estimate, \eqn{RSS/(n - p)}: least-squares residuals are smaller than
+#'    the errors.
 #' 2. For each of `B` replicates, the residuals are resampled with replacement
 #'    and added to the fitted positions, and the whole method (both node
 #'    searches) is rerun, giving that replicate's path and trajectory nodes.
 #' 3. The replicate's nodes are then fit, without any noise, to the fitted
-#'    positions. This is the conditional mean \eqn{E[\hat\beta \mid nodes]} for
-#'    those nodes.
-#' 4. The selection part is the variance of those conditional means across
-#'    replicates. They are projected onto the original trajectory's regions
-#'    (a cubic per region, by least squares), so the selection covariance has the
-#'    same form as OneShot's and the two can be added.
+#'    positions. This is the conditional mean \eqn{m_b = E[\hat\beta \mid nodes]}
+#'    for those nodes, a C1 cubic spline on the replicate's own trajectory nodes.
+#' 4. The selection part at each time is the sample variance (divisor
+#'    \eqn{B - 1}) of the conditional means there,
+#'    \eqn{V_{sel}(t) = \frac{1}{B - 1}\sum_b (m_b(t) - \bar m(t))^2}.
+#'    The conditional means are kept as they are, with no projection onto the
+#'    original nodes.
 #'
-#' The returned trajectory's `Cov` is the total (within + selection), so
-#' [visualizeEstTraj()], [coverageRateTraj()] and [avgCIWidthTraj()] use the
-#' total uncertainty. The separate pieces are returned in `Variance`.
+#' The pointwise intervals are then
+#' \eqn{\hat\beta(t) \pm z \sqrt{s_w^2(t) + V_{sel}(t)}}, with \eqn{s_w^2(t)} the
+#' within-node variance from OneShot's covariance. The returned trajectory keeps
+#' OneShot's covariance as `Cov` and carries the conditional means as
+#' `SelectionMeans`; [visualizeEstTraj()], [coverageRateTraj()] and
+#' [avgCIWidthTraj()] add the selection part whenever `SelectionMeans` is
+#' present. Set it to `NULL` for intervals from OneShot's covariance alone.
 #'
 #' Because the conditional means are fit without noise, the selection part
 #' settles with few replicates: 20 is usually plenty. This part still conditions
@@ -71,14 +80,13 @@
 #'
 #' @returns a list with:
 #' * `EstPath`: the EstimatedPath object.
-#' * `EstTraj`: the EstimatedTrajectory object. Its `Cov` is the total covariance (OneShot's covariance plus the
-#'   selection part if `bootstrap`, otherwise OneShot's covariance alone).
-#' * `Variance`: if `bootstrap`, a list with `Within` (OneShot's covariance per region), `Selection` (the
-#'   selection covariance per region), `Total` (their sum) and `Pointwise`, a data frame with the time, trajectory,
-#'   and the within, selection and total variances of the trajectory value with the selection share of the total.
-#'   NULL otherwise.
-#' * `Bootstrap`: if `bootstrap`, a list with `B`, `Successful` (the number of replicates that fit) and `Nodes`
-#'   (each replicate's path and trajectory nodes). NULL otherwise.
+#' * `EstTraj`: the EstimatedTrajectory object, with OneShot's covariance as `Cov`. If `bootstrap`, it also has
+#'   `SelectionMeans`: the conditional means, one per successful replicate (each a list with `Traj` and `TimeSplits`).
+#' * `Variance`: if `bootstrap`, a list with `Within` (OneShot's covariance per region) and `Pointwise`, a data
+#'   frame with the time, trajectory, and the within, selection and total variances of the trajectory value with
+#'   the selection share of the total. NULL otherwise.
+#' * `Bootstrap`: if `bootstrap`, a list with `B`, `Successful` (the number of replicates that fit), `Nodes`
+#'   (each replicate's path and trajectory nodes) and `ResidualScale` (the residuals' scale factor). NULL otherwise.
 #' @export
 #'
 #' @examples
@@ -87,7 +95,7 @@
 #' fit = getEstimatedTrajectories_Full(ExData, baseVectorFields, traj_nsplits = 50,
 #'                                     bootstrap = TRUE, B = 10, quiet = TRUE)
 #' head(fit$Variance$Pointwise)
-#' # Coverage of the true trajectories with the total covariance
+#' # Coverage of the true trajectories with the total variance
 #' coverageRateTraj(fit$EstTraj, ExTraj$Traj, ExTraj$TimeSplits)
 #' }
 #'
@@ -163,14 +171,15 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   resid = as.matrix(Data[, -1]) - fitted
   resid = sweep(resid, 2, colMeans(resid))
 
-  TimeSplits = EstTraj$TimeSplits
-  n_regions = length(TimeSplits) - 1
-  n_models = nrow(EstTraj$Traj[[1]])
+  # Least-squares residuals are smaller than the errors: rescale them so the
+  # resampled errors have variance RSS/(n - p), with p the path's free
+  # parameters per dimension, matching the path's own variance estimate.
+  n_obs = nrow(resid)
+  p_path = splineFreeParams(length(EstPath$Path), inferPathVSmooth(EstPath, default = V_Smooth))
+  residual_scale = if(n_obs > p_path) sqrt(n_obs/(n_obs - p_path)) else 1
+  resid = resid*residual_scale
 
-  # Times on each original trajectory region, to project the conditional means onto its cubics
-  region_t = lapply(seq_len(n_regions), function(r){seq(TimeSplits[r], TimeSplits[r + 1], length.out = 25)})
-
-  coef_draws = lapply(seq_len(n_regions), function(r){matrix(NA_real_, B, 4*n_models)})
+  means = vector("list", B)
   nodes = vector("list", B)
 
   for(b in seq_len(B)){
@@ -192,36 +201,27 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
       oneShotFixedNodes(EstPath_m, EstTraj_b$TimeSplits, baseVectorFields, V_Smooth, quad_nodes)
     }, TRUE), error = function(e){NULL})
 
-    if(is.null(cond_traj)){
-      next
-    }
-
-    for(r in seq_len(n_regions)){
-      u = region_t[[r]] - TimeSplits[r]
-      X = cbind(u^3, u^2, u, 1)
-      y = evaluateTrajAt(region_t[[r]], cond_traj)
-      coef_draws[[r]][b, ] = c(qr.solve(X, y))
+    if(!is.null(cond_traj)){
+      # Kept as it is, on the replicate's own nodes: no projection
+      means[[b]] = list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits)
     }
   }
 
-  ok = !is.na(coef_draws[[1]][, 1])
+  ok = !vapply(means, is.null, logical(1))
   n_ok = sum(ok)
 
   if(n_ok < 2){
     stop("Fewer than two bootstrap replicates could be fit.", call. = FALSE)
   }
 
-  Cov_Within = EstTraj$Cov
-  Cov_Selection = lapply(coef_draws, function(draws){stats::cov(draws[ok, , drop = FALSE])})
-  Cov_Total = mapply(`+`, Cov_Within, Cov_Selection, SIMPLIFY = FALSE)
-
-  EstTraj$Cov = Cov_Total
+  # OneShot's covariance stays the within part; the conditional means give the
+  # selection part pointwise, and the interval functions add the two.
+  EstTraj$SelectionMeans = means[ok]
 
   list(EstPath = EstPath,
        EstTraj = EstTraj,
-       Variance = list(Within = Cov_Within, Selection = Cov_Selection, Total = Cov_Total,
-                       Pointwise = pointwiseTrajVariance(TimeSplits, Cov_Within, Cov_Selection, n_models, t_grid_size)),
-       Bootstrap = list(B = B, Successful = n_ok, Nodes = nodes[ok]))
+       Variance = list(Within = EstTraj$Cov, Pointwise = pointwiseTrajVariance(EstTraj, t_grid_size)),
+       Bootstrap = list(B = B, Successful = n_ok, Nodes = nodes[ok], ResidualScale = residual_scale))
 
 }
 
@@ -258,21 +258,58 @@ evaluateTrajAt = function(t, EstTraj){
 
 }
 
+# The within-node variance of each trajectory's value at times t, from
+# OneShot's covariance (one row per time, one column per trajectory).
+trajWithinVariance = function(EstTraj, t){
+
+  TimeSplits = EstTraj$TimeSplits
+  n_models = nrow(EstTraj$Traj[[1]])
+  idx = pmin(pmax(findInterval(t, TimeSplits, left.open = TRUE), 1), length(TimeSplits) - 1)
+  u = t - TimeSplits[idx]
+  B = cbind(u^3, u^2, u, 1)
+
+  variance = matrix(0, length(t), n_models)
+  for(r in unique(idx)){
+    sel = idx == r
+    Bs = B[sel, , drop = FALSE]
+    for(m in seq_len(n_models)){
+      block = EstTraj$Cov[[r]][1:4 + (m - 1)*4, 1:4 + (m - 1)*4]
+      variance[sel, m] = rowSums((Bs %*% block) * Bs)
+    }
+  }
+  pmax(variance, 0)
+
+}
+
+# The node-selection variance of each trajectory's value at times t: the sample
+# variance (divisor B - 1) of the bootstrap conditional means at each time.
+# Zero if the trajectory has no bootstrap (one row per time, one column per trajectory).
+trajSelectionVariance = function(EstTraj, t){
+
+  n_models = nrow(EstTraj$Traj[[1]])
+
+  if(is.null(EstTraj$SelectionMeans)){
+    return(matrix(0, length(t), n_models))
+  }
+
+  values = vapply(EstTraj$SelectionMeans, function(m){evaluateTrajAt(t, m)}, matrix(0, length(t), n_models))
+  values = array(values, c(length(t), n_models, length(EstTraj$SelectionMeans)))
+  apply(values, c(1, 2), stats::var)
+
+}
+
 # Within, selection and total variances of each trajectory's value on a time grid.
-pointwiseTrajVariance = function(TimeSplits, Cov_Within, Cov_Selection, n_models, t_grid_size){
+pointwiseTrajVariance = function(EstTraj, t_grid_size){
 
+  TimeSplits = EstTraj$TimeSplits
   t_grid = seq(min(TimeSplits), max(TimeSplits), by = t_grid_size)
-  idx = pmin(pmax(findInterval(t_grid, TimeSplits, left.open = TRUE), 1), length(TimeSplits) - 1)
+  within = trajWithinVariance(EstTraj, t_grid)
+  selection = trajSelectionVariance(EstTraj, t_grid)
 
-  rows = lapply(seq_len(n_models), function(m){
-    k = 1:4 + (m - 1)*4
-    v = t(sapply(seq_along(t_grid), function(i){
-      u = t_grid[i] - TimeSplits[idx[i]]
-      b = c(u^3, u^2, u, 1)
-      c(drop(t(b) %*% Cov_Within[[idx[i]]][k, k] %*% b), drop(t(b) %*% Cov_Selection[[idx[i]]][k, k] %*% b))
-    }))
-    data.frame(t = t_grid, trajectory = m, var_within = v[, 1], var_selection = v[, 2],
-               var_total = v[, 1] + v[, 2], selection_share = v[, 2]/(v[, 1] + v[, 2]))
+  rows = lapply(seq_len(ncol(within)), function(m){
+    total = within[, m] + selection[, m]
+    data.frame(t = t_grid, trajectory = m, var_within = within[, m], var_selection = selection[, m],
+               var_total = total, selection_share = ifelse(total > 0, selection[, m]/total, 0))
   })
 
   do.call(rbind, rows)

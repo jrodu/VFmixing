@@ -420,14 +420,14 @@ runSimulationStudy_Continuity2D = function(seed,
     if(!is.null(EstTraj)){
       traj_dist = orNA(cubicAvgSquareDist(EstTraj$Traj, TrueTraj$Traj, EstTraj$TimeSplits, TrueTraj$TimeSplits), NA_real_)
 
-      # With the bootstrap, EstTraj$Cov is the total (within + selection) covariance
+      # With the bootstrap, the intervals add the selection variance from EstTraj$SelectionMeans
       traj_cov = orNA(stats::setNames(coverageRateTraj(EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
       traj_width = orNA(stats::setNames(avgCIWidthTraj(EstTraj, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
 
       if(!is.null(Variance)){
         # The same fit with OneShot's (within-node) covariance alone
         EstTraj_within = EstTraj
-        EstTraj_within$Cov = Variance$Within
+        EstTraj_within$SelectionMeans = NULL
         traj_cov_within = orNA(stats::setNames(coverageRateTraj(EstTraj_within, TrueTraj$Traj, TrueTraj$TimeSplits, CL = CL), traj_names), na_trajs)
         traj_width_within = orNA(stats::setNames(avgCIWidthTraj(EstTraj_within, CL = CL, t_grid_size = t_step), traj_names), na_trajs)
         selection_share = mean(Variance$Pointwise$selection_share)

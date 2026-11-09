@@ -263,11 +263,20 @@ variance:
 
 $$\mathrm{Var}(\hat\beta) = \underbrace{E[\mathrm{Var}(\hat\beta \mid \text{nodes})]}_{\text{One-Shot's covariance}} + \underbrace{\mathrm{Var}(E[\hat\beta \mid \text{nodes}])}_{\text{node selection}}$$
 
-One-Shot provides the first part exactly. For the second, a residual
-bootstrap reruns both node searches on `B` resampled data sets, then fits each
-replicate's nodes, without noise, to the fitted path: the spread of those fits
-is the node-selection variance. Because those fits have no noise in them, a
-small `B` (20 by default) is enough.
+One-Shot provides the first part. For the second, a residual bootstrap reruns
+both node searches on `B` resampled data sets, then fits each replicate's
+nodes, without noise, to the fitted path. Each of those fits, $m_b(t)$, is the
+conditional mean for that replicate's nodes, and the node-selection variance at
+each time is their sample variance,
+
+$$V_{\text{sel}}(t) = \frac{1}{B - 1}\sum_{b=1}^{B}\big(m_b(t) - \bar m(t)\big)^2,$$
+
+computed pointwise, with no projection onto the original nodes. The interval
+at time $t$ is $\hat\beta(t) \pm z\sqrt{s_w^2(t) + V_{\text{sel}}(t)}$, where
+$s_w^2(t)$ comes from One-Shot's covariance. The residuals are scaled by
+$\sqrt{n/(n - p)}$ before resampling, so the replicates' noise matches the
+path's variance estimate. Because the conditional means have no noise in them,
+a small `B` (20 by default) is enough.
 
 ```{r, results = "hide"}
 set.seed(1)
@@ -284,9 +293,10 @@ The run time, in seconds, with 20 bootstrap replicates:
 FullTime
 ```
 
-The returned trajectory's `Cov` is the total, so the plotting and coverage
-functions use the full uncertainty. The separate pieces are kept in
-`Fit$Variance`, including the pointwise variances on a time grid:
+The returned trajectory keeps One-Shot's covariance as `Cov` and carries the
+conditional means as `SelectionMeans`, and the plotting, coverage and width
+functions add the selection variance whenever those are present. The pointwise
+pieces on a time grid are in `Fit$Variance$Pointwise`:
 
 ```{r}
 head(Fit$Variance$Pointwise)
@@ -300,7 +310,7 @@ the node-selection part added:
 
 ```{r}
 OneShotOnly <- Fit$EstTraj
-OneShotOnly$Cov <- Fit$Variance$Within
+OneShotOnly$SelectionMeans <- NULL
 
 coverageRateTraj(OneShotOnly, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
 coverageRateTraj(Fit$EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
