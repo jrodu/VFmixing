@@ -9,7 +9,8 @@
 #
 # Each seed covers 3 error levels x 3 trajectory complexities x 5 variants:
 # BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, and 2x BIC + bootstrap
-# with every trajectory region split in two (B = 20).
+# with every trajectory region split in two (B = 20). The split variant reuses
+# the bootstrap, so it adds only a few seconds.
 # These times were measured with traj_nsplits = 100. The default is now 300,
 # which makes the low error, high complexity setting slower.
 # Each seed takes roughly 20 minutes on one core, most of it in the low error,

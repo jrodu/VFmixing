@@ -62,3 +62,18 @@ test_that("progress is printed as the replicate runs", {
 
   expect_length(testthat::capture_messages(small_run(1, variants = "2x BIC", keep_fits = FALSE)), 0)
 })
+
+test_that("the refined bootstrap variant reuses the bootstrap and splits every trajectory region", {
+  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"))
+  r = run$Results
+  expect_true(all(is.na(r$error)))
+  plain = r[r$variant == "2x BIC + bootstrap", ]
+  refined = r[r$variant == "2x BIC + refine + bootstrap", ]
+  expect_equal(refined$traj_regions, 2*plain$traj_regions)
+  expect_equal(refined$path_regions, plain$path_regions)
+  expect_false(is.na(refined$selection_share))
+  # the same path fit: the refined variant reused the bootstrap fit
+  fits = run$Fits[[1]]
+  expect_identical(fits[["2x BIC + refine + bootstrap"]]$EstPath, fits[["2x BIC + bootstrap"]]$EstPath)
+  expect_length(fits[["2x BIC + refine + bootstrap"]]$EstTraj$SelectionMeans, 3)
+})

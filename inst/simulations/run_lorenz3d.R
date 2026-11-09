@@ -8,7 +8,8 @@
 #   system.file("simulations", "run_lorenz3d.R", package = "VFmixing")
 #
 # Each seed covers 3 error levels x 3 trajectory complexities with 2x BIC +
-# bootstrap (B = 20).
+# bootstrap (B = 20), and the same with every trajectory region split in two.
+# The split variant reuses the bootstrap, so it adds only a few seconds.
 # These times were measured with traj_nsplits = 100. The default is now 300,
 # which makes the low error, high complexity setting slower.
 # Each seed takes roughly an hour on one core, most of it (about 45 minutes) in
