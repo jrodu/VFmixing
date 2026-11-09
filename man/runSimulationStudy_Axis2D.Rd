@@ -8,13 +8,15 @@ runSimulationStudy_Axis2D(
   seed,
   error_sd = c(low = 0.001, med = 0.01, high = 0.1),
   n_regions = c(low = 2, med = 10, high = 50),
-  variants = c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"),
+  variants = c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap",
+    "2x BIC + refine + bootstrap"),
   B = 20,
+  traj_refine = 1,
   patience = 10,
   t_end = 20,
   t_step = 0.01,
   path_nsplits = NULL,
-  traj_nsplits = 100,
+  traj_nsplits = 300,
   CL = 0.95,
   sigma = 0.5,
   k = 0.5,
@@ -33,7 +35,10 @@ runSimulationStudy_Axis2D(
 
 \item{variants}{a character vector of variants. See Details.}
 
-\item{B}{a whole number of at least 2. The number of bootstrap replicates for \code{"2x BIC + bootstrap"}.}
+\item{B}{a whole number of at least 2. The number of bootstrap replicates for the bootstrap variants.}
+
+\item{traj_refine}{a positive whole number. Each selected trajectory region is split into this many equal regions
+and refit (see \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}). The default, 1, keeps the selected regions.}
 
 \item{patience}{NULL or a positive integer. Passed to every path and trajectory search.}
 
@@ -94,15 +99,21 @@ level's standard deviation to each position. All data sets are simulated
 on which variants are run.
 
 \strong{Variants.} Every variant fits a FullFours path and OneShot trajectories
-with BIC selection, C1 smoothness and \code{patience}. Each entry of \code{variants}
+with BIC selection, C1 smoothness and \code{patience}, and splits
+each selected trajectory region into \code{traj_refine} regions (by default 1, so
+none are split). Each entry of \code{variants}
 is one of:
 \itemize{
 \item \code{"BIC"}: the regions BIC selects, for both the path and the trajectories.
 \item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
 \item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
 \item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
-\code{B} bootstrap replicates added to OneShot's covariance, through the law of
-total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+\code{B} bootstrap replicates added to OneShot's variance at each time, through
+the law of total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
+\item \code{"2x BIC + refine + bootstrap"}: \code{"2x BIC + bootstrap"}, with every selected
+trajectory region split in two (twice \code{traj_refine}), in the bootstrap
+replicates too. This shows what the extra trajectory regions buy where the
+remaining bias comes from trajectory nodes that miss the true ones.
 }
 
 \strong{Metrics.} For each setting and variant:
@@ -117,9 +128,9 @@ intervals, per dimension.
 confidence intervals, per trajectory.
 \item \verb{path_width_*}: \code{\link[=avgCIWidthPath]{avgCIWidthPath()}} with prediction intervals, per dimension.
 \item \verb{traj_width_*}: \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}}, per trajectory.
-\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for \code{"2x BIC + bootstrap"},
+\item \verb{traj_coverage_within_*}, \verb{traj_width_within_*}: for the bootstrap variants,
 the same with OneShot's covariance alone (without the selection part).
-\item \code{selection_share}: for \code{"2x BIC + bootstrap"}, the average share of the
+\item \code{selection_share}: for the bootstrap variants, the average share of the
 trajectory variance that comes from the node selection.
 \item \code{time_total}: elapsed seconds for the fit (including the bootstrap).
 }

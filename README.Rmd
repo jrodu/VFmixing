@@ -336,13 +336,17 @@ be stopped and resumed, or split across machines by seed.
 
 | Study | Vector fields | Settings | Variants |
 |---|---|---|---|
-| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap |
+| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
 | `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap |
 | `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap |
 | `runSimulationStudy_Collinearity2D()` | x-axis and a field at a random angle | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_ErrorProcess2D()` | rotation and expansion, noisy velocity at a random SNR | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Misspecification2D()` | data from rotation and expansion, fit with scaled versions | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Continuity2D()` | random gridded fields, nearest / bilinear / bicubic | low error, medium complexity, 3 continuities | 2x BIC + bootstrap |
+
+Every study allows up to 300 trajectory regions (`traj_nsplits`) and takes a
+`traj_refine` argument (1 by default) that splits each selected trajectory
+region before refitting.
 
 The Axis study isolates the effect of each piece: the fields are constant, so
 any undercoverage comes from the bias and the node selection rather than from

@@ -10,11 +10,12 @@ runSimulationStudy_Lorenz3D(
   n_regions = c(low = 2, med = 10, high = 50),
   variants = "2x BIC + bootstrap",
   B = 20,
+  traj_refine = 1,
   patience = 10,
   t_end = 20,
   t_step = 0.01,
   path_nsplits = NULL,
-  traj_nsplits = 100,
+  traj_nsplits = 300,
   CL = 0.95,
   sigma = 0.5,
   k = 0.5,
@@ -34,6 +35,9 @@ runSimulationStudy_Lorenz3D(
 \item{variants}{a character vector of variants. See Details.}
 
 \item{B}{a whole number of at least 2. The number of bootstrap replicates for \code{"2x BIC + bootstrap"}.}
+
+\item{traj_refine}{a positive whole number. Each selected trajectory region is split into this many equal regions
+and refit (see \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}). The default, 1, keeps the selected regions.}
 
 \item{patience}{NULL or a positive integer. Passed to every path and trajectory search.}
 
@@ -104,14 +108,16 @@ level's standard deviation to each position. All data sets are simulated
 on which variants are run.
 
 \strong{Variants.} Every variant fits a FullFours path and OneShot trajectories
-with BIC selection, C1 smoothness and \code{patience}. Each entry of \code{variants}
+with BIC selection, C1 smoothness and \code{patience}, and splits
+each selected trajectory region into \code{traj_refine} regions (by default 1, so
+none are split). Each entry of \code{variants}
 is one of:
 \itemize{
 \item \code{"BIC"}: the regions BIC selects, for both the path and the trajectories.
 \item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
 \item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
 \item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
-\code{B} bootstrap replicates added to OneShot's covariance, through the law of
+\code{B} bootstrap replicates added to OneShot's variance at each time, through the law of
 total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
 }
 

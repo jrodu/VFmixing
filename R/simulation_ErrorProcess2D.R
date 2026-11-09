@@ -38,13 +38,15 @@
 #' before any fitting.
 #'
 #' **Variants.** Every variant fits a FullFours path and OneShot trajectories
-#' with BIC selection, C1 smoothness and `patience`. Each entry of `variants`
+#' with BIC selection, C1 smoothness and `patience`, and splits
+#' each selected trajectory region into `traj_refine` regions (by default 1, so
+#' none are split). Each entry of `variants`
 #' is one of:
 #' * `"BIC"`: the regions BIC selects, for both the path and the trajectories.
 #' * `"2x BIC path only"`: twice BIC's path regions, BIC's trajectory regions.
 #' * `"2x BIC"`: twice BIC's regions for both (the default undersmoothing).
 #' * `"2x BIC + bootstrap"`: `"2x BIC"`, with the node-selection variance from
-#'   `B` bootstrap replicates added to OneShot's covariance, through the law of
+#'   `B` bootstrap replicates added to OneShot's variance at each time, through the law of
 #'   total variance ([getEstimatedTrajectories_Full()]).
 #'
 #' **Metrics.** For each setting and variant:
@@ -73,6 +75,8 @@
 #' @param log10_snr_range a numeric vector of length 2. The range of the uniform \eqn{\log_{10}} SNR.
 #' @param variants a character vector of variants. See Details.
 #' @param B a whole number of at least 2. The number of bootstrap replicates for `"2x BIC + bootstrap"`.
+#' @param traj_refine a positive whole number. Each selected trajectory region is split into this many equal regions
+#' and refit (see [getEstimatedTrajectories_OneShot()]). The default, 1, keeps the selected regions.
 #' @param patience NULL or a positive integer. Passed to the path and trajectory searches.
 #' @param t_end a positive number. The end time of the simulation (it starts at 0).
 #' @param t_step a positive number. The time step of the data and of the noisy path solution.
@@ -115,9 +119,9 @@ runSimulationStudy_ErrorProcess2D = function(seed,
                                              error_sd = c(low = 0.001),
                                              n_regions = c(med = 10),
                                              log10_snr_range = c(-1, 1),
-                                             variants = "2x BIC + bootstrap", B = 20,
+                                             variants = "2x BIC + bootstrap", B = 20, traj_refine = 1,
                                              patience = 10, t_end = 20, t_step = 0.01,
-                                             path_nsplits = NULL, traj_nsplits = 100, CL = 0.95,
+                                             path_nsplits = NULL, traj_nsplits = 300, CL = 0.95,
                                              sigma = 0.5, k = 0.5, start_range = c(-100, 100),
                                              keep_fits = TRUE, quiet = TRUE, progress = TRUE){
 
@@ -163,6 +167,10 @@ runSimulationStudy_ErrorProcess2D = function(seed,
 
   if(length(variants) < 1 || anyDuplicated(variants) || !all(variants %in% c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"))){
     stop("variants must be distinct values from \"BIC\", \"2x BIC path only\", \"2x BIC\" and \"2x BIC + bootstrap\".", call. = FALSE)
+  }
+
+  if(length(traj_refine) != 1 || !is.numeric(traj_refine) || traj_refine < 1 || traj_refine != round(traj_refine)){
+    stop("traj_refine must be a positive whole number.", call. = FALSE)
   }
 
   if("2x BIC + bootstrap" %in% variants && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
@@ -277,7 +285,8 @@ runSimulationStudy_ErrorProcess2D = function(seed,
 
       if(variant == "2x BIC + bootstrap"){
         fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
-                                                       patience = patience, undersmooth = TRUE, bootstrap = TRUE, B = B, quiet = TRUE))
+                                                       patience = patience, undersmooth = TRUE, traj_refine = traj_refine,
+                                                       bootstrap = TRUE, B = B, quiet = TRUE))
         EstPath = fit$EstPath
         EstTraj = fit$EstTraj
         Variance = fit$Variance
@@ -286,7 +295,7 @@ runSimulationStudy_ErrorProcess2D = function(seed,
                                                          patience = patience, undersmooth = variant != "BIC"))
         EstTraj = runQuietly(getEstimatedTrajectories_OneShot(EstPath = EstPath, nsplits = traj_nsplits, baseVectorFields = fitFields,
                                                               V_Smooth = F, Model_Selection_Type = "BIC", patience = patience,
-                                                              undersmooth = variant == "2x BIC"))
+                                                              undersmooth = variant == "2x BIC", refine = traj_refine))
       }
 
       time_total = as.numeric(difftime(Sys.time(), t0, units = "secs"))
@@ -402,7 +411,7 @@ runSimulationStudy_ErrorProcess2D = function(seed,
 
   out = list(Seed = seed,
              Settings = list(study = "ErrorProcess2D", error_sd = error_sd, n_regions = n_regions, log10_snr_range = log10_snr_range,
-                             variants = variants, B = B, patience = patience, t_end = t_end, t_step = t_step,
+                             variants = variants, B = B, traj_refine = traj_refine, patience = patience, t_end = t_end, t_step = t_step,
                              path_nsplits = path_nsplits, traj_nsplits = traj_nsplits, CL = CL,
                              sigma = sigma, k = k, start_range = start_range),
              SNR = snr,
