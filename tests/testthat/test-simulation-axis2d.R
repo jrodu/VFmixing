@@ -75,3 +75,22 @@ test_that("the variants differ only where they should", {
   expect_equal(rows("2x BIC + bootstrap")$traj_avg_sq_dist, rows("2x BIC")$traj_avg_sq_dist)
   expect_equal(rows("2x BIC + bootstrap")$traj_width_within_Trajectory1, rows("2x BIC")$traj_width_Trajectory1)
 })
+
+test_that("the refined bootstrap variant splits every trajectory region in two", {
+  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"), keep_fits = FALSE)
+  r = run$Results
+  expect_true(all(is.na(r$error)))
+  plain = r[r$variant == "2x BIC + bootstrap", ]
+  refined = r[r$variant == "2x BIC + refine + bootstrap", ]
+  expect_equal(refined$traj_regions, 2*plain$traj_regions)
+  expect_false(is.na(refined$selection_share))
+  expect_true(refined$traj_width_Trajectory1 >= refined$traj_width_within_Trajectory1 - 1e-12)
+})
+
+test_that("traj_refine splits the trajectory regions of every variant", {
+  a = small_run(8, variants = "2x BIC", keep_fits = FALSE)
+  b = small_run(8, variants = "2x BIC", traj_refine = 2, keep_fits = FALSE)
+  expect_equal(b$Results$traj_regions, 2*a$Results$traj_regions)
+  expect_equal(b$Settings$traj_refine, 2)
+  expect_error(small_run(1, traj_refine = 0), "traj_refine")
+})
