@@ -278,7 +278,10 @@ at time $t$ is $\hat\beta(t) \pm z\sqrt{s_w^2(t) + V_{\text{sel}}(t)}$, where
 $s_w^2(t)$ comes from One-Shot's covariance. The residuals are scaled by
 $\sqrt{n/(n - p)}$ before resampling, so the replicates' noise matches the
 path's variance estimate. Because the conditional means have no noise in them,
-a small `B` (20 by default) is enough.
+a small `B` (20 by default) is enough. The replicates are independent, so
+`cores = 4` (say) runs them in parallel, with the same result for any number
+of cores. On Windows the parallel workers use the installed package and are
+given the global objects the vector field function uses.
 
 ```{r, results = "hide"}
 set.seed(1)

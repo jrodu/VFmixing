@@ -55,6 +55,18 @@
 #' [avgCIWidthTraj()] add the selection part whenever `SelectionMeans` is
 #' present. Set it to `NULL` for intervals from OneShot's covariance alone.
 #'
+#' **Parallel replicates (`cores`).** The replicates are independent, so with
+#' `cores` greater than 1 they run in parallel. Every replicate's resampling is
+#' drawn before any of them run, so the result is the same for any number of
+#' cores, and a seed gives the same answer on any machine. On Linux and macOS
+#' the replicates run in forked processes ([parallel::mclapply()]). Windows
+#' can't fork, so there a socket cluster is started: its workers load VFmixing
+#' from the installed package (so install the version you are using; a
+#' `devtools::load_all()` copy isn't seen by them), and the global variables and
+#' functions that `baseVectorFields` uses are copied to them. On a cluster
+#' scheduler, request as many cores as you pass, and set `OMP_NUM_THREADS=1` so
+#' the math library doesn't start threads of its own.
+#'
 #' Because the conditional means are fit without noise, the selection part
 #' settles with few replicates: 20 is usually plenty. This part still conditions
 #' on the base vector fields evaluated along the estimated path, so the error
@@ -76,6 +88,7 @@
 #' @param B a positive integer. The number of bootstrap replicates.
 #' @param quad_nodes a positive integer. Passed to [getEstimatedTrajectories_OneShot()].
 #' @param t_grid_size a positive number. The time grid for the pointwise variances in `Variance$Pointwise`.
+#' @param cores a positive whole number. The number of cores to run the bootstrap replicates on. See Details.
 #' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
 #'
 #' @returns a list with:
@@ -102,7 +115,9 @@
 getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = NULL, traj_nsplits = 100,
                                          path_method = "FullFours", V_Smooth = F, Model_Selection_Type = "BIC",
                                          patience = 10, undersmooth = T, traj_refine = 1, bootstrap = F, B = 20,
-                                         quad_nodes = 20, t_grid_size = 0.01, quiet = F){
+                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, quiet = F){
+
+  checkCores(cores)
 
   if(!(path_method %in% c("FullFours", "FullRegression", "Projection"))){
     stop("path_method must be \"FullFours\", \"FullRegression\" or \"Projection\": OneShot needs a path with a covariance structure.",
@@ -179,33 +194,40 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   residual_scale = if(n_obs > p_path) sqrt(n_obs/(n_obs - p_path)) else 1
   resid = resid*residual_scale
 
-  means = vector("list", B)
-  nodes = vector("list", B)
+  # Every replicate's resampling is drawn here, before any replicate runs, so
+  # the results are the same however many cores run them.
+  draws = lapply(seq_len(B), function(b){sample(nrow(resid), replace = TRUE)})
 
-  for(b in seq_len(B)){
-
-    if(!quiet){
-      message("Bootstrap replicate ", b, "/", B)
-    }
+  runReplicate = function(b){
 
     Data_b = Data_fit
-    Data_b[, -1] = fitted + resid[sample(nrow(resid), replace = TRUE), , drop = FALSE]
+    Data_b[, -1] = fitted + resid[draws[[b]], , drop = FALSE]
 
-    cond_traj = tryCatch(runQuietly({
+    tryCatch(runQuietly({
       EstPath_b = fitPath(Data_b)
       EstTraj_b = fitTraj(EstPath_b)
-      nodes[[b]] = list(Path = EstPath_b$TimeSplits, Traj = EstTraj_b$TimeSplits)
 
       # The conditional mean for this replicate's nodes: the same nodes fit to the noise-free fitted positions
       EstPath_m = runEstPathStep_FullRegression(Data_fit, EstPath_b$TimeSplits, V_Smooth = V_Smooth)
-      oneShotFixedNodes(EstPath_m, EstTraj_b$TimeSplits, baseVectorFields, V_Smooth, quad_nodes)
+      cond_traj = oneShotFixedNodes(EstPath_m, EstTraj_b$TimeSplits, baseVectorFields, V_Smooth, quad_nodes)
+
+      # Kept as it is, on the replicate's own nodes: no projection
+      list(Mean = list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits),
+           Nodes = list(Path = EstPath_b$TimeSplits, Traj = EstTraj_b$TimeSplits))
     }, TRUE), error = function(e){NULL})
 
-    if(!is.null(cond_traj)){
-      # Kept as it is, on the replicate's own nodes: no projection
-      means[[b]] = list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits)
-    }
   }
+
+  if(!quiet){
+    message("Running ", B, " bootstrap replicates", if(cores > 1) stringr::str_c(" on ", cores, " cores"), "...")
+  }
+
+  replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields)
+
+  # A replicate that failed (or whose worker failed) gives NULL or an error object
+  replicates = lapply(replicates, function(r){if(is.list(r) && !is.null(r$Mean)) r else NULL})
+  means = lapply(replicates, function(r){r$Mean})
+  nodes = lapply(replicates, function(r){r$Nodes})
 
   ok = !vapply(means, is.null, logical(1))
   n_ok = sum(ok)
@@ -300,6 +322,78 @@ refineEstimatedTrajectories_Full = function(fit, Data, baseVectorFields, refine 
        EstTraj = EstTraj,
        Variance = list(Within = EstTraj$Cov, Pointwise = pointwiseTrajVariance(EstTraj, t_grid_size)),
        Bootstrap = Bootstrap)
+
+}
+
+# Validate a cores argument: a positive whole number.
+checkCores = function(cores){
+
+  if(length(cores) != 1 || !is.numeric(cores) || cores < 1 || cores != round(cores)){
+    stop("cores must be a positive whole number.", call. = FALSE)
+  }
+
+  invisible(cores)
+}
+
+# lapply(X, FUN), on up to `cores` cores. Forks on Linux and macOS
+# (parallel::mclapply). On Windows, which can't fork, it starts a socket
+# cluster: the workers load VFmixing from the same libraries, and any global
+# variables and functions that baseVectorFields uses are copied to them.
+runInParallel = function(X, FUN, cores, baseVectorFields = NULL){
+
+  cores = min(cores, length(X))
+
+  if(cores <= 1){
+    return(lapply(X, FUN))
+  }
+
+  if(.Platform$OS.type != "windows"){
+    return(parallel::mclapply(X, FUN, mc.cores = cores, mc.preschedule = FALSE))
+  }
+
+  cl = parallel::makeCluster(cores)
+  on.exit(parallel::stopCluster(cl))
+
+  parallel::clusterCall(cl, function(paths){.libPaths(paths); invisible(NULL)}, .libPaths())
+
+  if(!is.null(baseVectorFields)){
+    globals = fieldGlobals(baseVectorFields)
+    if(length(globals) > 0){
+      parallel::clusterExport(cl, globals, envir = globalenv())
+    }
+  }
+
+  parallel::parLapplyLB(cl, X, FUN)
+
+}
+
+# The global variables and functions a vector field function defined at the
+# top level uses, followed through the global functions it calls.
+fieldGlobals = function(f){
+
+  if(!is.function(f) || !identical(environment(f), globalenv()) || !requireNamespace("codetools", quietly = TRUE)){
+    return(character(0))
+  }
+
+  found = character(0)
+  queue = list(f)
+
+  while(length(queue) > 0){
+    g = queue[[1]]
+    queue = queue[-1]
+    names_g = codetools::findGlobals(g)
+    names_g = names_g[vapply(names_g, exists, logical(1), envir = globalenv(), inherits = FALSE)]
+    new = setdiff(names_g, found)
+    found = c(found, new)
+    for(nm in new){
+      obj = get(nm, envir = globalenv())
+      if(is.function(obj) && identical(environment(obj), globalenv())){
+        queue[[length(queue) + 1]] = obj
+      }
+    }
+  }
+
+  found
 
 }
 

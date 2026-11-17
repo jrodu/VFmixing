@@ -68,6 +68,8 @@
 #' @param B a whole number of at least 2. The number of bootstrap replicates for `"2x BIC + bootstrap"`.
 #' @param traj_refine a positive whole number. Each selected trajectory region is split into this many equal regions
 #' and refit (see [getEstimatedTrajectories_OneShot()]). The default, 1, keeps the selected regions.
+#' @param cores a positive whole number. The cores each bootstrap runs its replicates on (see
+#' [getEstimatedTrajectories_Full()]). Results don't depend on it.
 #' @param patience NULL or a positive integer. Passed to the path and trajectory searches.
 #' @param t_end a positive number. The end time of the simulation (it starts at 0).
 #' @param t_step a positive number. The time step of the data and of the Runge-Kutta solution.
@@ -110,7 +112,7 @@ runSimulationStudy_Collinearity2D = function(seed,
                                              error_sd = c(low = 0.001),
                                              n_regions = c(med = 10),
                                              theta_range = c(0, pi/2),
-                                             variants = "2x BIC + bootstrap", B = 20, traj_refine = 1,
+                                             variants = "2x BIC + bootstrap", B = 20, traj_refine = 1, cores = 1,
                                              patience = 10, t_end = 20, t_step = 0.01,
                                              path_nsplits = NULL, traj_nsplits = 300, CL = 0.95,
                                              sigma = 0.5, k = 0.5, start_range = c(-100, 100),
@@ -166,6 +168,10 @@ runSimulationStudy_Collinearity2D = function(seed,
 
   if(length(traj_refine) != 1 || !is.numeric(traj_refine) || traj_refine < 1 || traj_refine != round(traj_refine)){
     stop("traj_refine must be a positive whole number.", call. = FALSE)
+  }
+
+  if(length(cores) != 1 || !is.numeric(cores) || cores < 1 || cores != round(cores)){
+    stop("cores must be a positive whole number.", call. = FALSE)
   }
 
   if("2x BIC + bootstrap" %in% variants && (length(B) != 1 || !is.numeric(B) || B < 2 || B != round(B))){
@@ -245,7 +251,7 @@ runSimulationStudy_Collinearity2D = function(seed,
       if(variant == "2x BIC + bootstrap"){
         fit = runQuietly(getEstimatedTrajectories_Full(SimData, fitFields, path_nsplits = nsplits_path, traj_nsplits = traj_nsplits,
                                                        patience = patience, undersmooth = TRUE, traj_refine = traj_refine,
-                                                       bootstrap = TRUE, B = B, quiet = TRUE))
+                                                       bootstrap = TRUE, B = B, cores = cores, quiet = TRUE))
         EstPath = fit$EstPath
         EstTraj = fit$EstTraj
         Variance = fit$Variance
@@ -371,7 +377,7 @@ runSimulationStudy_Collinearity2D = function(seed,
 
   out = list(Seed = seed,
              Settings = list(study = "Collinearity2D", error_sd = error_sd, n_regions = n_regions, theta_range = theta_range,
-                             variants = variants, B = B, traj_refine = traj_refine, patience = patience, t_end = t_end, t_step = t_step,
+                             variants = variants, B = B, traj_refine = traj_refine, cores = cores, patience = patience, t_end = t_end, t_step = t_step,
                              path_nsplits = path_nsplits, traj_nsplits = traj_nsplits, CL = CL,
                              sigma = sigma, k = k, start_range = start_range),
              Theta = theta,

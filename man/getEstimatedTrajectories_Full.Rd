@@ -19,6 +19,7 @@ getEstimatedTrajectories_Full(
   B = 20,
   quad_nodes = 20,
   t_grid_size = 0.01,
+  cores = 1,
   quiet = F
 )
 }
@@ -52,6 +53,8 @@ regions and refit. The default, 1, keeps the selected regions. See Details.}
 \item{quad_nodes}{a positive integer. Passed to \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}.}
 
 \item{t_grid_size}{a positive number. The time grid for the pointwise variances in \code{Variance$Pointwise}.}
+
+\item{cores}{a positive whole number. The number of cores to run the bootstrap replicates on. See Details.}
 
 \item{quiet}{a boolean. If TRUE, the progress output of the estimation functions is suppressed.}
 }
@@ -124,6 +127,18 @@ OneShot's covariance as \code{Cov} and carries the conditional means as
 \code{SelectionMeans}; \code{\link[=visualizeEstTraj]{visualizeEstTraj()}}, \code{\link[=coverageRateTraj]{coverageRateTraj()}} and
 \code{\link[=avgCIWidthTraj]{avgCIWidthTraj()}} add the selection part whenever \code{SelectionMeans} is
 present. Set it to \code{NULL} for intervals from OneShot's covariance alone.
+
+\strong{Parallel replicates (\code{cores}).} The replicates are independent, so with
+\code{cores} greater than 1 they run in parallel. Every replicate's resampling is
+drawn before any of them run, so the result is the same for any number of
+cores, and a seed gives the same answer on any machine. On Linux and macOS
+the replicates run in forked processes (\code{\link[parallel:mcdummies]{parallel::mclapply()}}). Windows
+can't fork, so there a socket cluster is started: its workers load VFmixing
+from the installed package (so install the version you are using; a
+\code{devtools::load_all()} copy isn't seen by them), and the global variables and
+functions that \code{baseVectorFields} uses are copied to them. On a cluster
+scheduler, request as many cores as you pass, and set \code{OMP_NUM_THREADS=1} so
+the math library doesn't start threads of its own.
 
 Because the conditional means are fit without noise, the selection part
 settles with few replicates: 20 is usually plenty. This part still conditions
