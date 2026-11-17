@@ -38,7 +38,8 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
     Omega_t = trajTransitionMatrix(TimeSplits, n_models, Traj_VSmooth)
 
     Sigma_Traj = blockDiagDense(integral_list_traj)
-    Sigma_PathTraj = do.call(rbind, lapply(RegionCaches, `[[`, "S"))
+    # Sparse: each trajectory region only overlaps a few path regions
+    Sigma_PathTraj = pathTrajSparse(RegionCaches)
 
     normal_matrix = crossprod(Omega_t, Sigma_Traj) %*% Omega_t
 
@@ -52,22 +53,17 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 
     # Least-squares map from the path coefficients to the trajectory coefficients:
     # Omega_t (Omega_t' Sigma_Traj Omega_t)^+ Omega_t' Sigma_PathTraj Omega_p
-    Path_to_Traj_Matrix = Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, Sigma_PathTraj %*% Omega_p))
+    Path_to_Traj_Matrix = Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, as.matrix(Sigma_PathTraj %*% Omega_p)))
 
     traj_coef = c(Path_to_Traj_Matrix %*% free_path_coef)
 
-    free_path_cov = as.matrix(Matrix::bdiag(EstPath$Free_Parameter_Cov))
-    full_traj_cov = Path_to_Traj_Matrix %*% tcrossprod(free_path_cov, Path_to_Traj_Matrix)
-
-    traj_cov_list = lapply(seq_len(n_regions), function(x){
-      full_traj_cov[1:(4*n_models) + (4*n_models)*(x-1), 1:(4*n_models) + (4*n_models)*(x-1)]
-    })
+    traj_cov_list = trajCovBlocks(Path_to_Traj_Matrix, EstPath$Free_Parameter_Cov, n_regions, 4*n_models)
 
   } else{
 
     # The same coefficients from a single dense solve against the path's
     # coefficient vector (C2 trajectories, or if the banded solve failed)
-    traj_coef = c(Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, Sigma_PathTraj %*% (Omega_p %*% free_path_coef))))
+    traj_coef = c(Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, as.matrix(Sigma_PathTraj %*% (Omega_p %*% free_path_coef)))))
 
     traj_cov_list = NULL
 
@@ -93,7 +89,7 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
   # the square of the number of regions
   list(Traj = EstTraj, TimeSplits = TimeSplits, Error = Error_v, n_splits = n_regions, Cov = traj_cov_list, Sigma2 = Sigma2_list,
        IntegralList_Traj = if(with_cov) integral_list_traj else NULL,
-       IntegralList_PathTraj = if(with_cov) lapply(RegionCaches, function(cache){t(cache$S)}) else NULL,
+       IntegralList_PathTraj = if(with_cov) lapply(seq_along(RegionCaches), function(r){Matrix::t(pathTrajSparse(RegionCaches[r]))}) else NULL,
        PosSplits = pos_splits)
 
 }

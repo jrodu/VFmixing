@@ -81,20 +81,51 @@ oneShotRegionCache = function(lower, upper, EstPath, baseVectorFields, n_dim, n_
     }
   }
 
-  # Weighted path-velocity design: rows (node, dim), cols (path region, dim, cubic coefficient)
-  Psi = matrix(0, n_t*n_dim, 4*n_dim*Rp)
-  dB = cbind(3*path$s^2, 2*path$s, 1, 0)
+  # This region's rows of Sigma_PathTraj: S = A' Psi, with Psi the weighted
+  # path-velocity design (rows (node, dim), cols (path region, dim, cubic
+  # coefficient)). A node lies in one path region, so each row of Psi has only
+  # 4 non-zeros; rather than build Psi (dense, its size grows with the square of
+  # the number of path regions), each path region's columns of S are summed
+  # directly from the nodes inside it. The same sums, without the zeros.
+  #
+  # Only the path regions this region overlaps (a contiguous range) have
+  # non-zero columns, so only those are stored: S holds them, and S_cols gives
+  # their columns among all n_path_cols path coefficients (see pathTrajFull()).
+  touched = range(path$idx)
+  offset = (touched[1] - 1)*4*n_dim
+  S_cols = offset + seq_len((touched[2] - touched[1] + 1)*4*n_dim)
+  S = matrix(0, 4*n_models, length(S_cols))
+  dB = cbind(3*path$s^2, 2*path$s, 1)   # the fourth basis function's derivative is 0
   for(d in seq_len(n_dim)){
     rows = (seq_len(n_t) - 1)*n_dim + d
-    for(k in 1:4){
-      cols = (path$idx - 1)*4*n_dim + (d - 1)*4 + k
-      Psi[cbind(rows, cols)] = sw * dB[, k]
+    A_d = A[rows, , drop = FALSE]
+    for(k in 1:3){
+      sums = rowsum(A_d * (sw * dB[, k]), path$idx)   # one row per path region touched
+      cols = (as.integer(rownames(sums)) - 1)*4*n_dim + (d - 1)*4 + k - offset
+      S[, cols] = t(sums)
     }
   }
 
   list(lower = lower, upper = upper, t = t, w = w, vel = path$vel, F = Fa,
        G = crossprod(A),          # this region's block of Sigma_Traj
-       S = crossprod(A, Psi))     # this region's rows of Sigma_PathTraj
+       S = S, S_cols = S_cols, n_path_cols = 4*n_dim*Rp)
+}
+
+# A region's rows of Sigma_PathTraj across all the path coefficients (zeros
+# outside the path regions it overlaps).
+pathTrajFull = function(cache){
+  out = matrix(0, nrow(cache$S), cache$n_path_cols)
+  out[, cache$S_cols] = cache$S
+  out
+}
+
+# Sigma_PathTraj as a sparse matrix: every region's rows, stacked.
+pathTrajSparse = function(RegionCaches){
+  k = nrow(RegionCaches[[1]]$S)
+  i = unlist(lapply(seq_along(RegionCaches), function(r){rep((r - 1)*k + seq_len(k), length(RegionCaches[[r]]$S_cols))}))
+  j = unlist(lapply(RegionCaches, function(cache){rep(cache$S_cols, each = k)}))
+  x = unlist(lapply(RegionCaches, function(cache){c(cache$S)}))
+  Matrix::sparseMatrix(i = i, j = j, x = x, dims = c(k*length(RegionCaches), RegionCaches[[1]]$n_path_cols))
 }
 
 # Integrated squared velocity error over one region for given trajectory coefficients.
@@ -188,7 +219,7 @@ oneShotCoefficientsC1 = function(RegionCaches, TimeSplits, path_coef, n_models){
     }
     list(L = L,
          K = crossprod(L, RegionCaches[[r]]$G %*% L),
-         b = crossprod(L, RegionCaches[[r]]$S %*% path_coef))
+         b = crossprod(L, RegionCaches[[r]]$S %*% path_coef[RegionCaches[[r]]$S_cols]))
   })
 
   n_unknowns = m2*(n_regions + 1)
@@ -223,5 +254,34 @@ oneShotCoefficientsC1 = function(RegionCaches, TimeSplits, path_coef, n_models){
     coef = blocks[[r]]$L %*% theta[offsets[r] + seq_len(k)]
     c(coef)
   }))
+
+}
+
+# The diagonal block of the trajectory coefficient covariance for each region,
+# M Cov(path) M', without forming the whole matrix. The path covariance is
+# block-diagonal, one block per dimension, so each dimension's columns of M are
+# used with its own block, and only the regions' diagonal blocks are formed.
+trajCovBlocks = function(M, path_cov, n_regions, k){
+
+  dims_ok = is.list(path_cov) && sum(vapply(path_cov, nrow, integer(1))) == ncol(M)
+
+  if(!dims_ok){
+    full = M %*% tcrossprod(as.matrix(Matrix::bdiag(path_cov)), M)
+    return(lapply(seq_len(n_regions), function(x){full[(x - 1)*k + seq_len(k), (x - 1)*k + seq_len(k)]}))
+  }
+
+  blocks = lapply(seq_len(n_regions), function(x){matrix(0, k, k)})
+  start = 0
+  for(C in path_cov){
+    cols = start + seq_len(nrow(C))
+    M_d = M[, cols, drop = FALSE]
+    W_d = M_d %*% C
+    for(x in seq_len(n_regions)){
+      rows = (x - 1)*k + seq_len(k)
+      blocks[[x]] = blocks[[x]] + tcrossprod(W_d[rows, , drop = FALSE], M_d[rows, , drop = FALSE])
+    }
+    start = start + nrow(C)
+  }
+  blocks
 
 }
