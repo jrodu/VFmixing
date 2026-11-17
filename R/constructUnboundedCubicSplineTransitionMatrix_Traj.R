@@ -8,17 +8,23 @@
 #' @export
 #'
 constructUnboundedCubicSplineTransitionMatrix_Traj = function(time_splits, n_models, V_Smooth = T){
-  
+
   Path_TransMat = constructUnboundedCubicSplineTransitionMatrix_Path(time_splits, V_Smooth)
-  
-  Traj_TransMat = c()
-  
-  for(i in 1:(length(time_splits)-1)){
-    
-    Traj_TransMat = rbind(Traj_TransMat, as.matrix(Matrix::bdiag(replicate(n_models, Path_TransMat[1:4 + (i-1)*4,], simplify = F))))
-    
+
+  # Each region's rows are a block-diagonal copy of the path transition rows,
+  # one block per model: filled into a preallocated matrix (binding row by row
+  # copies the whole matrix for every region)
+  n_regions = length(time_splits) - 1
+  n_free = ncol(Path_TransMat)
+  Traj_TransMat = matrix(0, 4*n_models*n_regions, n_models*n_free)
+
+  for(i in seq_len(n_regions)){
+    block = Path_TransMat[1:4 + (i-1)*4, , drop = FALSE]
+    for(m in seq_len(n_models)){
+      Traj_TransMat[(i-1)*4*n_models + (m-1)*4 + 1:4, (m-1)*n_free + seq_len(n_free)] = block
+    }
   }
-  
+
   Traj_TransMat
-  
+
 }

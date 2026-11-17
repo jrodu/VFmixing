@@ -63,3 +63,46 @@ test_that("linear-algebra helpers match the originals", {
   singular = crossprod(cbind(X[, 1:3], X[, 1] + X[, 2]))   # rank 3
   expect_equal(VFmixing:::psdSolve(singular, B), pracma::pinv(singular) %*% B)
 })
+
+test_that("the search's coefficient-only fits match the full fits", {
+  P = ExEstPath_FullFours
+  splits = seq(min(P$TimeSplits), max(P$TimeSplits), length.out = 7)
+  full = oneShotFixedNodes(P, splits, baseVectorFields, V_Smooth = FALSE)
+  fast = oneShotFixedNodes(P, splits, baseVectorFields, V_Smooth = FALSE, with_cov = FALSE)
+
+  expect_null(fast$Cov)
+  # the dense solve in the cumulative basis carries some rounding error
+  expect_equal(fast$Traj, full$Traj, tolerance = 1e-7)
+  expect_equal(fast$Error, full$Error, tolerance = 1e-7)
+  expect_equal(fast$PosSplits, full$PosSplits)
+
+  # the returned fit still has its covariance, the same as a fixed-node fit on its nodes
+  res = NULL
+  utils::capture.output(res <- getEstimatedTrajectories_OneShot(P, nsplits = 20, baseVectorFields = baseVectorFields,
+                                                                patience = 5, undersmooth = FALSE))
+  expect_false(is.null(res$Cov))
+  expect_equal(res$Cov, oneShotFixedNodes(P, res$TimeSplits, baseVectorFields, V_Smooth = FALSE)$Cov)
+  expect_equal(res$Traj, oneShotFixedNodes(P, res$TimeSplits, baseVectorFields, V_Smooth = FALSE)$Traj)
+})
+
+test_that("the banded C1 solve matches the dense solve, and falls back when it can't be used", {
+  P = ExEstPath_FullFours
+  splits = seq(min(P$TimeSplits), max(P$TimeSplits), length.out = 31)
+  full = oneShotFixedNodes(P, splits, baseVectorFields, V_Smooth = FALSE)
+  fast = oneShotFixedNodes(P, splits, baseVectorFields, V_Smooth = FALSE, with_cov = FALSE)
+  expect_equal(fast$Traj, full$Traj, tolerance = 1e-6)
+  # the same least-squares fit: the objective agrees
+  expect_equal(sum(fast$Error), sum(full$Error), tolerance = 1e-10)
+
+  # C2 trajectories use the dense solve
+  full2 = oneShotFixedNodes(P, splits[1:7], baseVectorFields, V_Smooth = TRUE)
+  fast2 = oneShotFixedNodes(P, splits[1:7], baseVectorFields, V_Smooth = TRUE, with_cov = FALSE)
+  expect_equal(fast2$Traj, full2$Traj, tolerance = 1e-6)
+
+  # a singular system is left to the dense solve
+  n_dim = nrow(P$Path[[1]])
+  gl = gaussLegendre(20)
+  caches = lapply(1:2, function(r){oneShotRegionCache(splits[r], splits[r + 1], P, baseVectorFields, n_dim, 2, gl)})
+  caches[[2]]$G = caches[[2]]$G*0
+  expect_null(oneShotCoefficientsC1(caches, splits[1:3], rep(1, ncol(caches[[1]]$S)), 2))
+})

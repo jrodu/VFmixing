@@ -11,7 +11,8 @@ runEstTrajStep_OneShot(
   Omega_p,
   n_dim,
   n_models,
-  Traj_VSmooth
+  Traj_VSmooth,
+  with_cov = TRUE
 )
 }
 \arguments{
@@ -30,6 +31,9 @@ path velocity at those nodes, and the region's blocks of the integral matrices.}
 \item{n_models}{a numeric scalar. The number of vector fields being mixed.}
 
 \item{Traj_VSmooth}{a boolean. TRUE if the trajectory should be estimated using C2 smoothness. FALSE if C1.}
+
+\item{with_cov}{a boolean. If FALSE, only the coefficients and errors are computed, with a single solve,
+and \code{Cov} is NULL. The node search uses this; it is much faster and gives the same coefficients.}
 }
 \value{
 an EstimatedTrajectory object.

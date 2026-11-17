@@ -65,7 +65,12 @@
 #' `devtools::load_all()` copy isn't seen by them), and the global variables and
 #' functions that `baseVectorFields` uses are copied to them. On a cluster
 #' scheduler, request as many cores as you pass, and set `OMP_NUM_THREADS=1` so
-#' the math library doesn't start threads of its own.
+#' the math library doesn't start threads of its own. A forked process can need
+#' as much memory as the whole R session when it starts, so request enough
+#' memory for about `cores` copies of the session. If the processes can't be
+#' started for lack of memory, fewer are used (halving down to one), with a
+#' warning; if a worker dies while running, its replicates are rerun in the
+#' session.
 #'
 #' Because the conditional means are fit without noise, the selection part
 #' settles with few replicates: 20 is usually plenty. This part still conditions
@@ -209,12 +214,12 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
 
       # The conditional mean for this replicate's nodes: the same nodes fit to the noise-free fitted positions
       EstPath_m = runEstPathStep_FullRegression(Data_fit, EstPath_b$TimeSplits, V_Smooth = V_Smooth)
-      cond_traj = oneShotFixedNodes(EstPath_m, EstTraj_b$TimeSplits, baseVectorFields, V_Smooth, quad_nodes)
+      cond_traj = oneShotFixedNodes(EstPath_m, EstTraj_b$TimeSplits, baseVectorFields, V_Smooth, quad_nodes, with_cov = FALSE)
 
       # Kept as it is, on the replicate's own nodes: no projection
       list(Mean = list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits),
            Nodes = list(Path = EstPath_b$TimeSplits, Traj = EstTraj_b$TimeSplits))
-    }, TRUE), error = function(e){NULL})
+    }, TRUE), error = function(e){list(Mean = NULL, Nodes = NULL, Error = conditionMessage(e))})   # this replicate failed to fit
 
   }
 
@@ -224,7 +229,10 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
 
   replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields)
 
-  # A replicate that failed (or whose worker failed) gives NULL or an error object
+  # A replicate that failed to fit has no conditional mean (and its error message)
+  errors = unlist(lapply(replicates, function(r){
+    if(is.list(r)) r$Error else if(inherits(r, "try-error")) as.character(r) else NULL
+  }))
   replicates = lapply(replicates, function(r){if(is.list(r) && !is.null(r$Mean)) r else NULL})
   means = lapply(replicates, function(r){r$Mean})
   nodes = lapply(replicates, function(r){r$Nodes})
@@ -233,7 +241,11 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   n_ok = sum(ok)
 
   if(n_ok < 2){
-    stop("Fewer than two bootstrap replicates could be fit.", call. = FALSE)
+    stop("Fewer than two bootstrap replicates could be fit.",
+         if(length(errors) > 0) stringr::str_c(" The first error was: ", errors[1]),
+         if(cores > 1 && .Platform$OS.type == "windows")
+           " On Windows the parallel workers use the installed VFmixing, so check it is the version you are using.",
+         call. = FALSE)
   }
 
   # OneShot's covariance stays the within part; the conditional means give the
@@ -311,7 +323,7 @@ refineEstimatedTrajectories_Full = function(fit, Data, baseVectorFields, refine 
 
   EstTraj$SelectionMeans = lapply(nodes, function(n){
     EstPath_m = runEstPathStep_FullRegression(Data_fit, n$Path, V_Smooth = V_Smooth)
-    cond_traj = oneShotFixedNodes(EstPath_m, n$Traj, baseVectorFields, V_Smooth, quad_nodes)
+    cond_traj = oneShotFixedNodes(EstPath_m, n$Traj, baseVectorFields, V_Smooth, quad_nodes, with_cov = FALSE)
     list(Traj = cond_traj$Traj, TimeSplits = cond_traj$TimeSplits)
   })
 
@@ -348,7 +360,7 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL){
   }
 
   if(.Platform$OS.type != "windows"){
-    return(parallel::mclapply(X, FUN, mc.cores = cores, mc.preschedule = FALSE))
+    return(forkWithFallback(X, FUN, cores))
   }
 
   cl = parallel::makeCluster(cores)
@@ -364,6 +376,42 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL){
   }
 
   parallel::parLapplyLB(cl, X, FUN)
+
+}
+
+# parallel::mclapply(X, FUN) on `cores` forked processes, made robust to memory
+# limits. If the processes can't be started (a fork can need as much memory as
+# the whole session, so many cores can exceed a job's memory), it retries on
+# half as many cores, down to running in this session. If a worker dies while
+# running (for example, killed for using too much memory), its elements are
+# rerun here. FUN must not return NULL itself: NULL marks a dead worker.
+forkWithFallback = function(X, FUN, cores){
+
+  while(cores > 1){
+
+    res = tryCatch(parallel::mclapply(X, FUN, mc.cores = cores, mc.preschedule = FALSE), error = function(e){e})
+
+    if(!inherits(res, "error")){
+      lost = which(vapply(res, function(r){is.null(r) || inherits(r, "try-error")}, logical(1)))
+      if(length(lost) > 0){
+        warning(length(lost), " of ", length(X), " parallel jobs didn't finish (a worker may have run out of memory); ",
+                "running them here instead.", call. = FALSE)
+        res[lost] = lapply(X[lost], FUN)
+      }
+      return(res)
+    }
+
+    if(!grepl("fork|memory", conditionMessage(res), ignore.case = TRUE)){
+      stop(res)
+    }
+
+    new_cores = max(1, floor(cores/2))
+    warning("Couldn't start ", cores, " processes (", conditionMessage(res), "); trying ", new_cores, ".", call. = FALSE)
+    cores = new_cores
+
+  }
+
+  lapply(X, FUN)
 
 }
 
@@ -397,8 +445,9 @@ fieldGlobals = function(f){
 
 }
 
-# OneShot trajectory with fixed nodes (no node search) on a given path.
-oneShotFixedNodes = function(EstPath, TimeSplits, baseVectorFields, V_Smooth = F, quad_nodes = 20){
+# OneShot trajectory with fixed nodes (no node search) on a given path. With
+# with_cov = FALSE, only the coefficients and errors (no covariance).
+oneShotFixedNodes = function(EstPath, TimeSplits, baseVectorFields, V_Smooth = F, quad_nodes = 20, with_cov = TRUE){
 
   n_dim = nrow(EstPath$Path[[1]])
   n_models = ncol(baseVectorFields(min(EstPath$TimeSplits), rep(0, n_dim)))
@@ -410,7 +459,7 @@ oneShotFixedNodes = function(EstPath, TimeSplits, baseVectorFields, V_Smooth = F
     oneShotRegionCache(TimeSplits[r], TimeSplits[r + 1], EstPath, baseVectorFields, n_dim, n_models, gl)
   })
 
-  runEstTrajStep_OneShot(EstPath, TimeSplits, caches, Omega_p, n_dim, n_models, V_Smooth)
+  runEstTrajStep_OneShot(EstPath, TimeSplits, caches, Omega_p, n_dim, n_models, V_Smooth, with_cov = with_cov)
 
 }
 

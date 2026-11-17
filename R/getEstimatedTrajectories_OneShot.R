@@ -13,38 +13,68 @@
 #' @param n_dim a numeric scalar. The number of dimensions in the path.
 #' @param n_models a numeric scalar. The number of vector fields being mixed.
 #' @param Traj_VSmooth a boolean. TRUE if the trajectory should be estimated using C2 smoothness. FALSE if C1.
+#' @param with_cov a boolean. If FALSE, only the coefficients and errors are computed, with a single solve,
+#' and `Cov` is NULL. The node search uses this; it is much faster and gives the same coefficients.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
 #'
-runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_dim, n_models, Traj_VSmooth){
+runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_dim, n_models, Traj_VSmooth, with_cov = TRUE){
 
   n_regions = length(TimeSplits) - 1
 
   free_path_coef = c(t(EstPath$Free_Parameters))
-  free_path_cov = as.matrix(Matrix::bdiag(EstPath$Free_Parameter_Cov))
-
-  Omega_t = trajTransitionMatrix(TimeSplits, n_models, Traj_VSmooth)
 
   integral_list_traj = lapply(RegionCaches, `[[`, "G")
-  Sigma_Traj = blockDiagDense(integral_list_traj)
-  Sigma_PathTraj = do.call(rbind, lapply(RegionCaches, `[[`, "S"))
 
-  # Least-squares map from the path coefficients to the trajectory coefficients:
-  # Omega_t (Omega_t' Sigma_Traj Omega_t)^+ Omega_t' Sigma_PathTraj Omega_p
-  Path_to_Traj_Matrix = Omega_t %*% psdSolve(crossprod(Omega_t, Sigma_Traj) %*% Omega_t,
-                                             crossprod(Omega_t, Sigma_PathTraj %*% Omega_p))
+  # Coefficients only, for C1 trajectories: a banded solve in a local basis
+  traj_coef = NULL
+  if(!with_cov && !Traj_VSmooth){
+    traj_coef = oneShotCoefficientsC1(RegionCaches, TimeSplits, c(Omega_p %*% free_path_coef), n_models)
+  }
 
-  traj_coef = c(Path_to_Traj_Matrix %*% free_path_coef)
+  if(with_cov || is.null(traj_coef)){
+
+    Omega_t = trajTransitionMatrix(TimeSplits, n_models, Traj_VSmooth)
+
+    Sigma_Traj = blockDiagDense(integral_list_traj)
+    Sigma_PathTraj = do.call(rbind, lapply(RegionCaches, `[[`, "S"))
+
+    normal_matrix = crossprod(Omega_t, Sigma_Traj) %*% Omega_t
+
+  }
+
+  if(!with_cov && !is.null(traj_coef)){
+
+    traj_cov_list = NULL
+
+  } else if(with_cov){
+
+    # Least-squares map from the path coefficients to the trajectory coefficients:
+    # Omega_t (Omega_t' Sigma_Traj Omega_t)^+ Omega_t' Sigma_PathTraj Omega_p
+    Path_to_Traj_Matrix = Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, Sigma_PathTraj %*% Omega_p))
+
+    traj_coef = c(Path_to_Traj_Matrix %*% free_path_coef)
+
+    free_path_cov = as.matrix(Matrix::bdiag(EstPath$Free_Parameter_Cov))
+    full_traj_cov = Path_to_Traj_Matrix %*% tcrossprod(free_path_cov, Path_to_Traj_Matrix)
+
+    traj_cov_list = lapply(seq_len(n_regions), function(x){
+      full_traj_cov[1:(4*n_models) + (4*n_models)*(x-1), 1:(4*n_models) + (4*n_models)*(x-1)]
+    })
+
+  } else{
+
+    # The same coefficients from a single dense solve against the path's
+    # coefficient vector (C2 trajectories, or if the banded solve failed)
+    traj_coef = c(Omega_t %*% psdSolve(normal_matrix, crossprod(Omega_t, Sigma_PathTraj %*% (Omega_p %*% free_path_coef))))
+
+    traj_cov_list = NULL
+
+  }
 
   EstTraj = lapply(seq_len(n_regions), function(r){
     matrix(traj_coef[(r - 1)*4*n_models + 1:(4*n_models)], ncol = 4, byrow = T)
-  })
-
-  full_traj_cov = Path_to_Traj_Matrix %*% tcrossprod(free_path_cov, Path_to_Traj_Matrix)
-
-  traj_cov_list = lapply(seq_len(n_regions), function(x){
-    full_traj_cov[1:(4*n_models) + (4*n_models)*(x-1), 1:(4*n_models) + (4*n_models)*(x-1)]
   })
 
   # Integrated squared velocity error in each region
@@ -82,6 +112,16 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' for every later candidate. With smooth vector fields the default of 20 nodes
 #' is accurate to around machine precision. Increase `quad_nodes` if
 #' `baseVectorFields` changes abruptly along the path.
+#'
+#' While searching, each candidate is fit without its covariance; the criteria
+#' other than "VarPos" only need the coefficients and errors. For C1
+#' trajectories that fit uses the local cubic Hermite basis (each trajectory's
+#' value and slope at the nodes), whose normal matrix is banded, so its cost
+#' grows about linearly with the number of regions; it is the same
+#' least-squares fit, with less rounding error. The returned trajectory is then
+#' refit on its nodes with the covariance, reusing the quadrature values
+#' computed during the search, so the results are the same as fitting every
+#' candidate in full.
 #'
 #' Candidates are produced by repeatedly splitting a region, up to `nsplits`
 #' splits. By default every candidate is fit and the best is chosen with
@@ -171,12 +211,34 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   # The path side never changes between candidates.
   Omega_p = constructUnboundedCubicSplineTransitionMatrix_Traj(EstPath$TimeSplits, n_dim, Path_V_Smooth)
 
+  # Every region's quadrature values are kept as they are computed, so the final
+  # fit (and any refinement) reuses them instead of computing them again.
+  region_store = new.env(hash = TRUE)
+
   newRegion = function(lower, upper){
-    oneShotRegionCache(lower, upper, EstPath, baseVectorFields, n_dim, n_models, gl)
+    key = paste(sprintf("%.17g", lower), sprintf("%.17g", upper))
+    cache = region_store[[key]]
+    if(is.null(cache)){
+      cache = oneShotRegionCache(lower, upper, EstPath, baseVectorFields, n_dim, n_models, gl)
+      assign(key, cache, envir = region_store)
+    }
+    cache
   }
 
+  # A fit with its covariance on given nodes
+  fitWithCov = function(time_splits){
+    caches = lapply(seq_len(length(time_splits) - 1), function(r){newRegion(time_splits[r], time_splits[r + 1])})
+    runEstTrajStep_OneShot(EstPath = EstPath, TimeSplits = time_splits, RegionCaches = caches, Omega_p = Omega_p, n_dim = n_dim, n_models = n_models,
+                           Traj_VSmooth = V_Smooth, with_cov = TRUE)
+  }
+
+  # The search only needs each candidate's coefficients and errors, so it skips
+  # the covariance (unless the criterion uses it); the returned fit gets it.
+  search_with_cov = Model_Selection_Type == "VarPos"
+
   fitCandidate = function(time_splits, caches){
-    runEstTrajStep_OneShot(EstPath = EstPath, TimeSplits = time_splits, RegionCaches = caches, Omega_p = Omega_p, n_dim = n_dim, n_models = n_models, Traj_VSmooth = V_Smooth)
+    runEstTrajStep_OneShot(EstPath = EstPath, TimeSplits = time_splits, RegionCaches = caches, Omega_p = Omega_p, n_dim = n_dim, n_models = n_models,
+                           Traj_VSmooth = V_Smooth, with_cov = search_with_cov)
   }
 
   tracker = trajPatienceTracker(patience, EstPath, Model_Selection_Type, V_Smooth, undersmooth = undersmooth)
@@ -241,8 +303,11 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   }
 
   if(refine > 1){
-    best = oneShotFixedNodes(EstPath, refineTimeSplits(best$TimeSplits, refine), baseVectorFields, V_Smooth, quad_nodes)
+    best = fitWithCov(refineTimeSplits(best$TimeSplits, refine))
     print(stringr::str_c("Refined to ", length(best$Traj), " regions."))
+  } else if(is.null(best$Cov)){
+    # The same fit, now with its covariance
+    best = fitWithCov(best$TimeSplits)
   }
 
   best

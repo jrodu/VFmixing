@@ -108,14 +108,9 @@ oneShotRegionError = function(cache, TrajCoef, n_dim, n_models){
   sum(cache$w * colSums((t(cache$vel) - est)^2))
 }
 
-# Transition matrix for the trajectory free parameters: the same as
-# constructUnboundedCubicSplineTransitionMatrix_Traj(), built with kronecker().
+# Transition matrix for the trajectory free parameters.
 trajTransitionMatrix = function(time_splits, n_models, V_Smooth){
-  Tp = constructUnboundedCubicSplineTransitionMatrix_Path(time_splits, V_Smooth)
-  I = diag(n_models)
-  do.call(rbind, lapply(seq_len(length(time_splits) - 1), function(i){
-    kronecker(I, Tp[1:4 + (i - 1)*4, , drop = FALSE])
-  }))
+  constructUnboundedCubicSplineTransitionMatrix_Traj(time_splits, n_models, V_Smooth)
 }
 
 # Dense block-diagonal matrix from a list of square blocks.
@@ -156,4 +151,77 @@ timesBlockDiag = function(M, blocks){
   n = vapply(blocks, nrow, integer(1))
   off = c(0, cumsum(n))
   do.call(cbind, lapply(seq_along(blocks), function(i){M[, off[i] + seq_len(n[i]), drop = FALSE] %*% blocks[[i]]}))
+}
+
+# The OneShot trajectory coefficients for C1 trajectories, without the
+# covariance, from a banded solve. The least-squares fit depends only on the
+# spline space, not on its basis, so this uses the local cubic Hermite basis:
+# each trajectory's value and slope at every node. Each region then touches
+# only its two end nodes, the normal matrix is banded, and a sparse Cholesky
+# solve costs about linear time in the number of regions (the cumulative basis
+# of trajTransitionMatrix() makes it dense). The coefficients are returned in
+# the usual per-region (dt^3, dt^2, dt, 1) form, the same layout as
+# runEstTrajStep_OneShot() uses. NULL if the system is singular or badly
+# conditioned, so the caller can fall back to the dense solve.
+oneShotCoefficientsC1 = function(RegionCaches, TimeSplits, path_coef, n_models){
+
+  n_regions = length(TimeSplits) - 1
+  m2 = 2*n_models          # unknowns per node: a value and a slope per trajectory
+  k = 4*n_models           # unknowns per region (its two end nodes), and its coefficients
+
+  # Hermite map from (y0, s0, y1, s1) to the cubic's (dt^3, dt^2, dt, 1) coefficients
+  hermite = function(h){
+    rbind(c(2/h^3, 1/h^2, -2/h^3, 1/h^2),
+          c(-3/h^2, -2/h, 3/h^2, -1/h),
+          c(0, 1, 0, 0),
+          c(1, 0, 0, 0))
+  }
+
+  # Unknowns are ordered by node, then trajectory, then (value, slope)
+  local = function(m){c(2*(m - 1) + 1:2, m2 + 2*(m - 1) + 1:2)}
+
+  blocks = lapply(seq_len(n_regions), function(r){
+    H = hermite(TimeSplits[r + 1] - TimeSplits[r])
+    L = matrix(0, k, k)
+    for(m in seq_len(n_models)){
+      L[(m - 1)*4 + 1:4, local(m)] = H
+    }
+    list(L = L,
+         K = crossprod(L, RegionCaches[[r]]$G %*% L),
+         b = crossprod(L, RegionCaches[[r]]$S %*% path_coef))
+  })
+
+  n_unknowns = m2*(n_regions + 1)
+  offsets = (seq_len(n_regions) - 1)*m2
+  idx = expand.grid(i = seq_len(k), j = seq_len(k))
+
+  normal = Matrix::sparseMatrix(i = unlist(lapply(offsets, function(o){o + idx$i})),
+                                j = unlist(lapply(offsets, function(o){o + idx$j})),
+                                x = unlist(lapply(blocks, function(bl){c(bl$K)})),
+                                dims = c(n_unknowns, n_unknowns))
+  normal = Matrix::forceSymmetric(normal)
+
+  rhs = numeric(n_unknowns)
+  for(r in seq_len(n_regions)){
+    rows = offsets[r] + seq_len(k)
+    rhs[rows] = rhs[rows] + blocks[[r]]$b
+  }
+
+  # Same conditioning rule as psdSolve(): otherwise let the dense solve handle it
+  ch = tryCatch(Matrix::chol(normal), error = function(e){NULL}, warning = function(w){NULL})
+  if(is.null(ch)){
+    return(NULL)
+  }
+  dg = Matrix::diag(ch)
+  if(!(min(dg) > 1e-6*max(dg))){
+    return(NULL)
+  }
+
+  theta = as.numeric(Matrix::solve(ch, Matrix::solve(Matrix::t(ch), rhs)))
+
+  unlist(lapply(seq_len(n_regions), function(r){
+    coef = blocks[[r]]$L %*% theta[offsets[r] + seq_len(k)]
+    c(coef)
+  }))
+
 }
