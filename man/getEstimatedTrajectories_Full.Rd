@@ -20,6 +20,7 @@ getEstimatedTrajectories_Full(
   quad_nodes = 20,
   t_grid_size = 0.01,
   cores = 1,
+  worker_setup = NULL,
   quiet = F
 )
 }
@@ -55,6 +56,10 @@ regions and refit. The default, 1, keeps the selected regions. See Details.}
 \item{t_grid_size}{a positive number. The time grid for the pointwise variances in \code{Variance$Pointwise}.}
 
 \item{cores}{a positive whole number. The number of cores to run the bootstrap replicates on. See Details.}
+
+\item{worker_setup}{NULL or a function with no arguments, run once in each separate R process the replicates
+use (on Windows and inside RStudio) before they start. Use it to rebuild what can't be copied to those
+processes, such as functions compiled with Rcpp. See Details.}
 
 \item{quiet}{a boolean. If TRUE, the progress output of the estimation functions is suppressed.}
 }
@@ -145,6 +150,12 @@ These load VFmixing from the installed package (so install the version you
 are using; a \code{devtools::load_all()} copy isn't seen by them), and the global
 variables and functions that \code{baseVectorFields} uses are copied to them.
 \code{options(VFmixing.parallel = "socket")} or \code{"fork"} overrides the choice.
+Compiled code can't be copied to these processes: if \code{baseVectorFields}
+uses a function compiled with Rcpp (\code{Rcpp::sourceCpp()} or
+\code{Rcpp::cppFunction()}), rebuild it in each of them with \code{worker_setup},
+for example \code{worker_setup = function(){Rcpp::sourceCpp("interp.cpp")}}
+(it runs after the global objects are copied, so what it defines replaces
+them). Functions from installed packages are fine, compiled or not.
 }
 
 Each worker limits the math library to one thread (fully so if the

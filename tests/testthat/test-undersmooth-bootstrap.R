@@ -294,3 +294,36 @@ test_that("OneShot can skip the returned fit's covariance", {
   expect_equal(b$TimeSplits, a$TimeSplits)
   expect_equal(b$Traj, a$Traj, tolerance = 1e-7)
 })
+
+test_that("worker_setup runs in every separate worker before the jobs", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = "socket")
+  on.exit(options(old))
+  setup = function(){assign("setup_value", 41, envir = globalenv())}
+  res = runInParallel(1:4, function(i){get("setup_value", envir = globalenv()) + 1}, cores = 2, worker_setup = setup)
+  expect_equal(unlist(res), rep(42, 4))
+})
+
+test_that("a compiled-code failure in the workers says how to fix it", {
+  old = options(VFmixing.parallel = "socket")
+  on.exit(options(old))
+  testthat::local_mocked_bindings(runInParallel = function(X, ...){
+    lapply(X, function(i){list(Mean = NULL, Nodes = NULL, Error = "NULL value passed as symbol address")})
+  })
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE,
+                                             B = 3, cores = 2, quiet = TRUE),
+               "worker_setup")
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, bootstrap = TRUE, worker_setup = 3), "worker_setup")
+})
+
+test_that("the global objects worker_setup uses are copied to the workers too", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = "socket")
+  env = globalenv()
+  assign("setup_base_value", 40, envir = env)
+  setup = function(){assign("setup_value", setup_base_value + 1, envir = globalenv())}
+  environment(setup) = env
+  on.exit({options(old); rm(setup_base_value, envir = env)})
+  res = runInParallel(1:2, function(i){get("setup_value", envir = globalenv()) + 1}, cores = 2, worker_setup = setup)
+  expect_equal(unlist(res), rep(42, 2))
+})
