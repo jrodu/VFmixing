@@ -12,6 +12,7 @@ runSimulationStudy_Axis2D(
     "2x BIC + refine + bootstrap"),
   B = 20,
   traj_refine = 1,
+  cores = 1,
   patience = 10,
   t_end = 20,
   t_step = 0.01,
@@ -39,6 +40,9 @@ runSimulationStudy_Axis2D(
 
 \item{traj_refine}{a positive whole number. Each selected trajectory region is split into this many equal regions
 and refit (see \code{\link[=getEstimatedTrajectories_OneShot]{getEstimatedTrajectories_OneShot()}}). The default, 1, keeps the selected regions.}
+
+\item{cores}{a positive whole number. The cores each bootstrap runs its replicates on (see
+\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}). Results don't depend on it.}
 
 \item{patience}{NULL or a positive integer. Passed to every path and trajectory search.}
 

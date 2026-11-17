@@ -202,3 +202,33 @@ test_that("refining a full fit matches refitting with traj_refine, without new s
   expect_identical(refineEstimatedTrajectories_Full(fit, d, axisFields, refine = 1), fit)
   expect_error(refineEstimatedTrajectories_Full(fit, d, axisFields, refine = 0), "refine")
 })
+
+test_that("the bootstrap gives the same result on any number of cores", {
+  skip_on_cran()
+  d = axisData()
+  set.seed(21)
+  one = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE, B = 4, quiet = TRUE)
+  set.seed(21)
+  two = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE, B = 4,
+                                      cores = 2, quiet = TRUE)
+
+  expect_equal(two$EstTraj$SelectionMeans, one$EstTraj$SelectionMeans)
+  expect_equal(two$Bootstrap$Nodes, one$Bootstrap$Nodes)
+  expect_equal(two$Variance$Pointwise, one$Variance$Pointwise)
+  expect_error(getEstimatedTrajectories_Full(d, axisFields, bootstrap = TRUE, cores = 0), "cores")
+})
+
+test_that("the globals a top-level vector field uses are found for the workers", {
+  env = globalenv()
+  assign("vf_test_scale", 2, envir = env)
+  helper = function(x){x*vf_test_scale}
+  environment(helper) = env
+  assign("vf_test_helper", helper, envir = env)
+  f = function(t, curPos){matrix(vf_test_helper(c(0, 1, 1, 0)), 2)}
+  environment(f) = env
+  on.exit(rm(vf_test_scale, vf_test_helper, envir = env))
+
+  expect_setequal(fieldGlobals(f), c("vf_test_helper", "vf_test_scale"))
+  # a field defined inside a function carries its own environment
+  expect_length(fieldGlobals(axisFields_local <- local(function(t, curPos){matrix(0, 2, 2)})), 0)
+})
