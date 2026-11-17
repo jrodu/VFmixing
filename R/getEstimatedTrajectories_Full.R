@@ -72,6 +72,12 @@
 #'   are using; a `devtools::load_all()` copy isn't seen by them), and the global
 #'   variables and functions that `baseVectorFields` uses are copied to them.
 #'   `options(VFmixing.parallel = "socket")` or `"fork"` overrides the choice.
+#'   Compiled code can't be copied to these processes: if `baseVectorFields`
+#'   uses a function compiled with Rcpp (`Rcpp::sourceCpp()` or
+#'   `Rcpp::cppFunction()`), rebuild it in each of them with `worker_setup`,
+#'   for example `worker_setup = function(){Rcpp::sourceCpp("interp.cpp")}`
+#'   (it runs after the global objects are copied, so what it defines replaces
+#'   them). Functions from installed packages are fine, compiled or not.
 #'
 #' Each worker limits the math library to one thread (fully so if the
 #' RhpcBLASctl package is installed), so the workers don't compete for the
@@ -103,6 +109,9 @@
 #' @param quad_nodes a positive integer. Passed to [getEstimatedTrajectories_OneShot()].
 #' @param t_grid_size a positive number. The time grid for the pointwise variances in `Variance$Pointwise`.
 #' @param cores a positive whole number. The number of cores to run the bootstrap replicates on. See Details.
+#' @param worker_setup NULL or a function with no arguments, run once in each separate R process the replicates
+#' use (on Windows and inside RStudio) before they start. Use it to rebuild what can't be copied to those
+#' processes, such as functions compiled with Rcpp. See Details.
 #' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
 #'
 #' @returns a list with:
@@ -129,9 +138,13 @@
 getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = NULL, traj_nsplits = 100,
                                          path_method = "FullFours", V_Smooth = F, Model_Selection_Type = "BIC",
                                          patience = 10, undersmooth = T, traj_refine = 1, bootstrap = F, B = 20,
-                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, quiet = F){
+                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, worker_setup = NULL, quiet = F){
 
   checkCores(cores)
+
+  if(!is.null(worker_setup) && !is.function(worker_setup)){
+    stop("worker_setup must be NULL or a function with no arguments.", call. = FALSE)
+  }
 
   if(!(path_method %in% c("FullFours", "FullRegression", "Projection"))){
     stop("path_method must be \"FullFours\", \"FullRegression\" or \"Projection\": OneShot needs a path with a covariance structure.",
@@ -238,7 +251,8 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   }
   boot_start = Sys.time()
 
-  replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields, progress = !quiet, label = "Bootstrap replicate")
+  replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields, progress = !quiet, label = "Bootstrap replicate",
+                             worker_setup = worker_setup)
 
   if(!quiet){
     message(sprintf("[%s] Bootstrap done in %.1f min", format(Sys.time(), "%H:%M:%S"),
@@ -257,9 +271,16 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   n_ok = sum(ok)
 
   if(n_ok < 2){
+    socket = cores > 1 && parallelType() == "socket"
+    compiled = length(errors) > 0 && any(grepl("symbol address|external pointer|NativeSymbol", errors))
     stop("Fewer than two bootstrap replicates could be fit.",
          if(length(errors) > 0) stringr::str_c(" The first error was: ", errors[1]),
-         if(cores > 1 && parallelType() == "socket")
+         if(socket && compiled)
+           stringr::str_c(" The parallel workers are separate R processes, and compiled code that baseVectorFields uses ",
+                          "(such as an Rcpp function) can't be copied to them. Rebuild it in each worker with worker_setup, ",
+                          "for example worker_setup = function(){Rcpp::sourceCpp(\"your_file.cpp\")}, or use forked workers ",
+                          "outside RStudio (options(VFmixing.parallel = \"fork\")).")
+         else if(socket)
            " The parallel workers use the installed VFmixing, so check it is the version you are using.",
          call. = FALSE)
   }
@@ -367,7 +388,7 @@ checkCores = function(cores){
 # (parallel::mclapply). On Windows, which can't fork, it starts a socket
 # cluster: the workers load VFmixing from the same libraries, and any global
 # variables and functions that baseVectorFields uses are copied to them.
-runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job"){
+runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job", worker_setup = NULL){
 
   cores = min(cores, length(X))
   job = parallelJob(X, FUN, progress, label, limit_threads = cores > 1)
@@ -391,11 +412,17 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
 
   parallel::clusterCall(cl, function(paths){.libPaths(paths); invisible(NULL)}, .libPaths())
 
-  if(!is.null(baseVectorFields)){
-    globals = fieldGlobals(baseVectorFields)
-    if(length(globals) > 0){
-      parallel::clusterExport(cl, globals, envir = globalenv())
-    }
+  # The global objects the field function and the setup function use
+  globals = unique(c(if(!is.null(baseVectorFields)) fieldGlobals(baseVectorFields),
+                     if(!is.null(worker_setup)) fieldGlobals(worker_setup)))
+  if(length(globals) > 0){
+    parallel::clusterExport(cl, globals, envir = globalenv())
+  }
+
+  # Anything the workers must build themselves, such as compiled (Rcpp)
+  # functions, whose pointers into compiled code don't survive being copied
+  if(!is.null(worker_setup)){
+    parallel::clusterCall(cl, worker_setup)
   }
 
   parallel::parLapplyLB(cl, seq_along(X), job)
