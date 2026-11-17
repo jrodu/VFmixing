@@ -257,3 +257,40 @@ test_that("forking falls back to fewer cores, and reruns jobs whose worker died"
   testthat::local_mocked_bindings(mclapply = function(...){stop("something else")}, .package = "parallel")
   expect_error(forkWithFallback(1:4, identity, 4), "something else")
 })
+
+test_that("the parallel type is sockets on Windows and in RStudio, forks otherwise, and can be overridden", {
+  old_opt = options(VFmixing.parallel = NULL)
+  old_env = Sys.getenv("RSTUDIO", unset = NA)
+  on.exit({options(old_opt); if(is.na(old_env)) Sys.unsetenv("RSTUDIO") else Sys.setenv(RSTUDIO = old_env)})
+
+  if(.Platform$OS.type == "windows"){
+    expect_equal(parallelType(), "socket")
+    options(VFmixing.parallel = "fork")
+    expect_equal(parallelType(), "socket")   # Windows can't fork
+  } else{
+    Sys.unsetenv("RSTUDIO")
+    expect_equal(parallelType(), "fork")
+    Sys.setenv(RSTUDIO = "1")
+    expect_equal(parallelType(), "socket")
+    options(VFmixing.parallel = "fork")
+    expect_equal(parallelType(), "fork")
+  }
+})
+
+test_that("parallel jobs report as they finish, and only when asked", {
+  job = parallelJob(c(5, 7), function(x){x + 1}, progress = TRUE, label = "Test job", limit_threads = FALSE)
+  expect_message(out <- job(2), "Test job 2/2 done")
+  expect_equal(out, 8)
+  quiet_job = parallelJob(c(5, 7), function(x){x + 1}, progress = FALSE, label = "Test job", limit_threads = FALSE)
+  expect_silent(quiet_job(1))
+})
+
+test_that("OneShot can skip the returned fit's covariance", {
+  d = axisData()
+  P = quietly(getEstimatedPaths_FullFours(d, nsplits = 150, patience = 10))
+  a = quietly(getEstimatedTrajectories_OneShot(P, nsplits = 30, baseVectorFields = axisFields, patience = 10))
+  b = quietly(getEstimatedTrajectories_OneShot(P, nsplits = 30, baseVectorFields = axisFields, patience = 10, return_cov = FALSE))
+  expect_null(b$Cov)
+  expect_equal(b$TimeSplits, a$TimeSplits)
+  expect_equal(b$Traj, a$Traj, tolerance = 1e-7)
+})

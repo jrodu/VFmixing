@@ -14,6 +14,7 @@ Suggests:
     gganimate,
     leaflet,
     leaflet.extras2,
+    RhpcBLASctl,
     plotly,
     shiny,
     shinyjs,

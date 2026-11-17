@@ -131,19 +131,29 @@ present. Set it to \code{NULL} for intervals from OneShot's covariance alone.
 \strong{Parallel replicates (\code{cores}).} The replicates are independent, so with
 \code{cores} greater than 1 they run in parallel. Every replicate's resampling is
 drawn before any of them run, so the result is the same for any number of
-cores, and a seed gives the same answer on any machine. On Linux and macOS
-the replicates run in forked processes (\code{\link[parallel:mcdummies]{parallel::mclapply()}}). Windows
-can't fork, so there a socket cluster is started: its workers load VFmixing
-from the installed package (so install the version you are using; a
-\code{devtools::load_all()} copy isn't seen by them), and the global variables and
-functions that \code{baseVectorFields} uses are copied to them. On a cluster
-scheduler, request as many cores as you pass, and set \code{OMP_NUM_THREADS=1} so
-the math library doesn't start threads of its own. A forked process can need
-as much memory as the whole R session when it starts, so request enough
-memory for about \code{cores} copies of the session. If the processes can't be
-started for lack of memory, fewer are used (halving down to one), with a
-warning; if a worker dies while running, its replicates are rerun in the
-session.
+cores, and a seed gives the same answer on any machine.
+\itemize{
+\item On Linux and macOS, outside RStudio, the replicates run in forked
+processes (\code{\link[parallel:mcdummies]{parallel::mclapply()}}). A forked process can need as much
+memory as the whole R session when it starts, so request enough memory for
+about \code{cores} copies of the session. If the processes can't be started for
+lack of memory, fewer are used (halving down to one), with a warning; if a
+worker dies while running, its replicates are rerun in the session.
+\item On Windows, which can't fork, and inside RStudio, where forked processes
+can hang, the replicates run in separate R processes (a socket cluster).
+These load VFmixing from the installed package (so install the version you
+are using; a \code{devtools::load_all()} copy isn't seen by them), and the global
+variables and functions that \code{baseVectorFields} uses are copied to them.
+\code{options(VFmixing.parallel = "socket")} or \code{"fork"} overrides the choice.
+}
+
+Each worker limits the math library to one thread (fully so if the
+RhpcBLASctl package is installed), so the workers don't compete for the
+cores; on a cluster scheduler, request as many cores as you pass. With
+\code{quiet = FALSE}, a timestamped line is printed as each replicate finishes. In
+a terminal or batch log these appear as they happen; in RStudio and other
+consoles, the lines from separate R processes aren't shown, but the start and
+end lines are.
 
 Because the conditional means are fit without noise, the selection part
 settles with few replicates: 20 is usually plenty. This part still conditions
