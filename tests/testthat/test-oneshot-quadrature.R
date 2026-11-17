@@ -11,7 +11,7 @@ test_that("quadrature integrals match the adaptive integrals", {
   for(r in 1:2){
     cache = VFmixing:::oneShotRegionCache(ts[r], ts[r + 1], P, baseVectorFields, 2, 2, gl)
     expect_lt(rel_diff(cache$G, adaptive_traj[[r]]), 1e-8)
-    expect_lt(rel_diff(t(cache$S), adaptive_pathtraj[[r]]), 1e-8)
+    expect_lt(rel_diff(t(pathTrajFull(cache)), adaptive_pathtraj[[r]]), 1e-8)
   }
 })
 
@@ -104,5 +104,32 @@ test_that("the banded C1 solve matches the dense solve, and falls back when it c
   gl = gaussLegendre(20)
   caches = lapply(1:2, function(r){oneShotRegionCache(splits[r], splits[r + 1], P, baseVectorFields, n_dim, 2, gl)})
   caches[[2]]$G = caches[[2]]$G*0
-  expect_null(oneShotCoefficientsC1(caches, splits[1:3], rep(1, ncol(caches[[1]]$S)), 2))
+  expect_null(oneShotCoefficientsC1(caches, splits[1:3], rep(1, caches[[1]]$n_path_cols), 2))
+})
+
+test_that("the path-velocity integrals are summed per path region, matching the dense product", {
+  P = ExEstPath_FullFours
+  n_dim = nrow(P$Path[[1]])
+  gl = gaussLegendre(20)
+  rng = range(P$TimeSplits)
+  for(region in list(rng, c(rng[1] + 0.31*diff(rng), rng[1] + 0.47*diff(rng)))){
+    cache = oneShotRegionCache(region[1], region[2], P, baseVectorFields, n_dim, 2, gl)
+
+    # The dense path-velocity design the sums replace
+    path = evaluatePathAt(cache$t, P)
+    n_t = length(cache$t)
+    Rp = length(P$TimeSplits) - 1
+    sw = sqrt(cache$w)
+    u = cache$t - region[1]
+    B = cbind(u^3, u^2, u, 1)
+    A = matrix(0, n_t*n_dim, 8)
+    Psi = matrix(0, n_t*n_dim, 4*n_dim*Rp)
+    dB = cbind(3*path$s^2, 2*path$s, 1, 0)
+    for(d in seq_len(n_dim)){
+      rows = (seq_len(n_t) - 1)*n_dim + d
+      for(m in 1:2) A[rows, (m - 1)*4 + 1:4] = sw*cache$F[d, m, ]*B
+      for(k in 1:4) Psi[cbind(rows, (path$idx - 1)*4*n_dim + (d - 1)*4 + k)] = sw*dB[, k]
+    }
+    expect_equal(pathTrajFull(cache), crossprod(A, Psi), tolerance = 1e-12)
+  }
 })
