@@ -138,7 +138,12 @@ from the installed package (so install the version you are using; a
 \code{devtools::load_all()} copy isn't seen by them), and the global variables and
 functions that \code{baseVectorFields} uses are copied to them. On a cluster
 scheduler, request as many cores as you pass, and set \code{OMP_NUM_THREADS=1} so
-the math library doesn't start threads of its own.
+the math library doesn't start threads of its own. A forked process can need
+as much memory as the whole R session when it starts, so request enough
+memory for about \code{cores} copies of the session. If the processes can't be
+started for lack of memory, fewer are used (halving down to one), with a
+warning; if a worker dies while running, its replicates are rerun in the
+session.
 
 Because the conditional means are fit without noise, the selection part
 settles with few replicates: 20 is usually plenty. This part still conditions

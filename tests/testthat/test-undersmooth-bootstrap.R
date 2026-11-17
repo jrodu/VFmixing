@@ -205,6 +205,8 @@ test_that("refining a full fit matches refitting with traj_refine, without new s
 
 test_that("the bootstrap gives the same result on any number of cores", {
   skip_on_cran()
+  # On Windows the workers load the installed package, which a load_all() session may not match
+  skip_if(.Platform$OS.type == "windows" && exists(".__DEVTOOLS__", envir = asNamespace("VFmixing")), "workers would use the installed package")
   d = axisData()
   set.seed(21)
   one = getEstimatedTrajectories_Full(d, axisFields, path_nsplits = 150, traj_nsplits = 30, bootstrap = TRUE, B = 4, quiet = TRUE)
@@ -231,4 +233,27 @@ test_that("the globals a top-level vector field uses are found for the workers",
   expect_setequal(fieldGlobals(f), c("vf_test_helper", "vf_test_scale"))
   # a field defined inside a function carries its own environment
   expect_length(fieldGlobals(axisFields_local <- local(function(t, curPos){matrix(0, 2, 2)})), 0)
+})
+
+test_that("forking falls back to fewer cores, and reruns jobs whose worker died", {
+  calls = c()
+  testthat::local_mocked_bindings(
+    mclapply = function(X, FUN, ..., mc.cores){
+      calls <<- c(calls, mc.cores)
+      if(mc.cores > 2) stop("unable to fork, possible reason: Cannot allocate memory")
+      res = lapply(X, FUN)
+      res[2] = list(NULL)   # this worker died
+      res
+    },
+    .package = "parallel")
+
+  w = testthat::capture_warnings(res <- forkWithFallback(1:4, function(x){x^2}, 8))
+  expect_equal(sum(grepl("Couldn't start", w)), 2)
+  expect_equal(sum(grepl("didn't finish", w)), 1)
+  expect_equal(res, list(1, 4, 9, 16))
+  expect_equal(calls, c(8, 4, 2))
+
+  # other errors are not retried
+  testthat::local_mocked_bindings(mclapply = function(...){stop("something else")}, .package = "parallel")
+  expect_error(forkWithFallback(1:4, identity, 4), "something else")
 })

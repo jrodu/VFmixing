@@ -61,6 +61,16 @@ for every later candidate. With smooth vector fields the default of 20 nodes
 is accurate to around machine precision. Increase \code{quad_nodes} if
 \code{baseVectorFields} changes abruptly along the path.
 
+While searching, each candidate is fit without its covariance; the criteria
+other than "VarPos" only need the coefficients and errors. For C1
+trajectories that fit uses the local cubic Hermite basis (each trajectory's
+value and slope at the nodes), whose normal matrix is banded, so its cost
+grows about linearly with the number of regions; it is the same
+least-squares fit, with less rounding error. The returned trajectory is then
+refit on its nodes with the covariance, reusing the quadrature values
+computed during the search, so the results are the same as fitting every
+candidate in full.
+
 Candidates are produced by repeatedly splitting a region, up to \code{nsplits}
 splits. By default every candidate is fit and the best is chosen with
 \code{Model_Selection_Type}. Setting \code{patience} stops the search once that many
