@@ -58,19 +58,28 @@
 #' **Parallel replicates (`cores`).** The replicates are independent, so with
 #' `cores` greater than 1 they run in parallel. Every replicate's resampling is
 #' drawn before any of them run, so the result is the same for any number of
-#' cores, and a seed gives the same answer on any machine. On Linux and macOS
-#' the replicates run in forked processes ([parallel::mclapply()]). Windows
-#' can't fork, so there a socket cluster is started: its workers load VFmixing
-#' from the installed package (so install the version you are using; a
-#' `devtools::load_all()` copy isn't seen by them), and the global variables and
-#' functions that `baseVectorFields` uses are copied to them. On a cluster
-#' scheduler, request as many cores as you pass, and set `OMP_NUM_THREADS=1` so
-#' the math library doesn't start threads of its own. A forked process can need
-#' as much memory as the whole R session when it starts, so request enough
-#' memory for about `cores` copies of the session. If the processes can't be
-#' started for lack of memory, fewer are used (halving down to one), with a
-#' warning; if a worker dies while running, its replicates are rerun in the
-#' session.
+#' cores, and a seed gives the same answer on any machine.
+#'
+#' * On Linux and macOS, outside RStudio, the replicates run in forked
+#'   processes ([parallel::mclapply()]). A forked process can need as much
+#'   memory as the whole R session when it starts, so request enough memory for
+#'   about `cores` copies of the session. If the processes can't be started for
+#'   lack of memory, fewer are used (halving down to one), with a warning; if a
+#'   worker dies while running, its replicates are rerun in the session.
+#' * On Windows, which can't fork, and inside RStudio, where forked processes
+#'   can hang, the replicates run in separate R processes (a socket cluster).
+#'   These load VFmixing from the installed package (so install the version you
+#'   are using; a `devtools::load_all()` copy isn't seen by them), and the global
+#'   variables and functions that `baseVectorFields` uses are copied to them.
+#'   `options(VFmixing.parallel = "socket")` or `"fork"` overrides the choice.
+#'
+#' Each worker limits the math library to one thread (fully so if the
+#' RhpcBLASctl package is installed), so the workers don't compete for the
+#' cores; on a cluster scheduler, request as many cores as you pass. With
+#' `quiet = FALSE`, a timestamped line is printed as each replicate finishes. In
+#' a terminal or batch log these appear as they happen; in RStudio and other
+#' consoles, the lines from separate R processes aren't shown, but the start and
+#' end lines are.
 #'
 #' Because the conditional means are fit without noise, the selection part
 #' settles with few replicates: 20 is usually plenty. This part still conditions
@@ -168,10 +177,10 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
                                                      patience = patience, undersmooth = undersmooth))
   }
 
-  fitTraj = function(EstPath){
+  fitTraj = function(EstPath, return_cov = TRUE){
     getEstimatedTrajectories_OneShot(EstPath, nsplits = traj_nsplits, baseVectorFields = baseVectorFields, V_Smooth = V_Smooth,
                                      Model_Selection_Type = Model_Selection_Type, quad_nodes = quad_nodes,
-                                     patience = patience, undersmooth = undersmooth, refine = traj_refine)
+                                     patience = patience, undersmooth = undersmooth, refine = traj_refine, return_cov = return_cov)
   }
 
   # ---- The fit on the data ---------------------------------------------------
@@ -210,7 +219,7 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
 
     tryCatch(runQuietly({
       EstPath_b = fitPath(Data_b)
-      EstTraj_b = fitTraj(EstPath_b)
+      EstTraj_b = fitTraj(EstPath_b, return_cov = FALSE)   # only its nodes are used
 
       # The conditional mean for this replicate's nodes: the same nodes fit to the noise-free fitted positions
       EstPath_m = runEstPathStep_FullRegression(Data_fit, EstPath_b$TimeSplits, V_Smooth = V_Smooth)
@@ -224,10 +233,17 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   }
 
   if(!quiet){
-    message("Running ", B, " bootstrap replicates", if(cores > 1) stringr::str_c(" on ", cores, " cores"), "...")
+    message(sprintf("[%s] Running %d bootstrap replicates%s...", format(Sys.time(), "%H:%M:%S"), B,
+                    if(cores > 1) stringr::str_c(" on ", min(cores, B), " cores (", parallelType(), " workers)") else ""))
   }
+  boot_start = Sys.time()
 
-  replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields)
+  replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields, progress = !quiet, label = "Bootstrap replicate")
+
+  if(!quiet){
+    message(sprintf("[%s] Bootstrap done in %.1f min", format(Sys.time(), "%H:%M:%S"),
+                    as.numeric(difftime(Sys.time(), boot_start, units = "mins"))))
+  }
 
   # A replicate that failed to fit has no conditional mean (and its error message)
   errors = unlist(lapply(replicates, function(r){
@@ -243,8 +259,8 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   if(n_ok < 2){
     stop("Fewer than two bootstrap replicates could be fit.",
          if(length(errors) > 0) stringr::str_c(" The first error was: ", errors[1]),
-         if(cores > 1 && .Platform$OS.type == "windows")
-           " On Windows the parallel workers use the installed VFmixing, so check it is the version you are using.",
+         if(cores > 1 && parallelType() == "socket")
+           " The parallel workers use the installed VFmixing, so check it is the version you are using.",
          call. = FALSE)
   }
 
@@ -351,20 +367,27 @@ checkCores = function(cores){
 # (parallel::mclapply). On Windows, which can't fork, it starts a socket
 # cluster: the workers load VFmixing from the same libraries, and any global
 # variables and functions that baseVectorFields uses are copied to them.
-runInParallel = function(X, FUN, cores, baseVectorFields = NULL){
+runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job"){
 
   cores = min(cores, length(X))
+  job = parallelJob(X, FUN, progress, label, limit_threads = cores > 1)
 
   if(cores <= 1){
-    return(lapply(X, FUN))
+    return(lapply(seq_along(X), job))
   }
 
-  if(.Platform$OS.type != "windows"){
-    return(forkWithFallback(X, FUN, cores))
+  if(parallelType() == "fork"){
+    # Keep this session's math library to one thread while forking: forked
+    # children of a session that has used threaded OpenBLAS can hang
+    restore = limitSessionThreads()
+    on.exit(restore(), add = TRUE)
+    return(forkWithFallback(seq_along(X), job, cores))
   }
 
-  cl = parallel::makeCluster(cores)
-  on.exit(parallel::stopCluster(cl))
+  # Separate R processes: their output (the progress lines) goes to this
+  # session's standard output, which a terminal or batch log shows
+  cl = parallel::makeCluster(cores, outfile = "")
+  on.exit(parallel::stopCluster(cl), add = TRUE)
 
   parallel::clusterCall(cl, function(paths){.libPaths(paths); invisible(NULL)}, .libPaths())
 
@@ -375,7 +398,78 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL){
     }
   }
 
-  parallel::parLapplyLB(cl, X, FUN)
+  parallel::parLapplyLB(cl, seq_along(X), job)
+
+}
+
+# How to run in parallel: "fork" (Linux and macOS) or "socket" (separate R
+# processes). Sockets on Windows, which can't fork, and inside RStudio, where
+# forked processes can hang. options(VFmixing.parallel = "socket") or "fork"
+# overrides the choice (fork is never used on Windows).
+parallelType = function(){
+
+  choice = getOption("VFmixing.parallel", "auto")
+
+  if(.Platform$OS.type == "windows"){
+    return("socket")
+  }
+  if(identical(choice, "fork") || identical(choice, "socket")){
+    return(choice)
+  }
+  if(identical(Sys.getenv("RSTUDIO"), "1")){
+    return("socket")
+  }
+  "fork"
+
+}
+
+# The function each parallel job runs, built here so it carries only what it
+# needs: it limits the math library to one thread, runs FUN on its element and
+# reports when it is done.
+parallelJob = function(X, FUN, progress, label, limit_threads){
+
+  n = length(X)
+  force(FUN); force(progress); force(label); force(limit_threads)
+
+  function(i){
+    if(limit_threads){
+      limitWorkerThreads()
+    }
+    t0 = Sys.time()
+    out = FUN(X[[i]])
+    if(progress){
+      message(sprintf("[%s] %s %d/%d done (%.1f s)", format(Sys.time(), "%H:%M:%S"), label, i, n,
+                      as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+    }
+    out
+  }
+
+}
+
+# One math-library thread in a parallel worker, so the workers don't compete
+# for the cores (needs the RhpcBLASctl package for BLAS libraries that are
+# already running; the environment variables cover anything started later).
+limitWorkerThreads = function(){
+
+  Sys.setenv(OMP_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1", MKL_NUM_THREADS = "1")
+  if(requireNamespace("RhpcBLASctl", quietly = TRUE)){
+    RhpcBLASctl::blas_set_num_threads(1)
+    RhpcBLASctl::omp_set_num_threads(1)
+  }
+  invisible(NULL)
+
+}
+
+# One math-library thread in this session, returning a function that restores
+# the previous number.
+limitSessionThreads = function(){
+
+  if(!requireNamespace("RhpcBLASctl", quietly = TRUE)){
+    return(function(){invisible(NULL)})
+  }
+  old = RhpcBLASctl::blas_get_num_procs()
+  RhpcBLASctl::blas_set_num_threads(1)
+  function(){RhpcBLASctl::blas_set_num_threads(old); invisible(NULL)}
 
 }
 

@@ -88,9 +88,12 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 
   pos_splits = unname(table(path_split_labels_unique) >= 8*n_models/n_dim)
 
+  # The integral blocks are kept only with the covariance (the returned fit):
+  # every search candidate keeping its own copy would use memory growing with
+  # the square of the number of regions
   list(Traj = EstTraj, TimeSplits = TimeSplits, Error = Error_v, n_splits = n_regions, Cov = traj_cov_list, Sigma2 = Sigma2_list,
-       IntegralList_Traj = integral_list_traj,
-       IntegralList_PathTraj = lapply(RegionCaches, function(cache){t(cache$S)}),
+       IntegralList_Traj = if(with_cov) integral_list_traj else NULL,
+       IntegralList_PathTraj = if(with_cov) lapply(RegionCaches, function(cache){t(cache$S)}) else NULL,
        PosSplits = pos_splits)
 
 }
@@ -165,6 +168,8 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #' criterion's choice. See Details.
 #' @param refine a positive whole number. Each region of the selected trajectory is split into this many equal
 #' regions and refit. The default, 1, keeps the selected regions. See Details.
+#' @param return_cov a boolean. If FALSE, the returned trajectory has no covariance (`Cov` is NULL), which saves its
+#' one dense covariance computation. The bootstrap uses this for its replicates, which only need their nodes.
 #'
 #' @returns an EstimatedTrajectory object.
 #' @export
@@ -182,7 +187,7 @@ runEstTrajStep_OneShot = function(EstPath, TimeSplits, RegionCaches, Omega_p, n_
 #'      EstPath = ExEstPath_FullFours,
 #'      nsplits = 100, baseVectorFields = baseVectorFields, patience = 10)
 #'
-getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL, undersmooth = T, refine = 1){
+getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, V_Smooth = F, Model_Selection_Type = "BIC", Random_Path = F, quad_nodes = 20, patience = NULL, undersmooth = T, refine = 1, return_cov = TRUE){
 
   Model_Selection_Type = checkTrajSelectionType(Model_Selection_Type)
 
@@ -225,11 +230,11 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
     cache
   }
 
-  # A fit with its covariance on given nodes
-  fitWithCov = function(time_splits){
+  # The final fit on given nodes, with its covariance unless return_cov is FALSE
+  fitFinal = function(time_splits){
     caches = lapply(seq_len(length(time_splits) - 1), function(r){newRegion(time_splits[r], time_splits[r + 1])})
     runEstTrajStep_OneShot(EstPath = EstPath, TimeSplits = time_splits, RegionCaches = caches, Omega_p = Omega_p, n_dim = n_dim, n_models = n_models,
-                           Traj_VSmooth = V_Smooth, with_cov = TRUE)
+                           Traj_VSmooth = V_Smooth, with_cov = return_cov)
   }
 
   # The search only needs each candidate's coefficients and errors, so it skips
@@ -303,11 +308,11 @@ getEstimatedTrajectories_OneShot = function(EstPath, nsplits, baseVectorFields, 
   }
 
   if(refine > 1){
-    best = fitWithCov(refineTimeSplits(best$TimeSplits, refine))
+    best = fitFinal(refineTimeSplits(best$TimeSplits, refine))
     print(stringr::str_c("Refined to ", length(best$Traj), " regions."))
-  } else if(is.null(best$Cov)){
+  } else if(return_cov && is.null(best$Cov)){
     # The same fit, now with its covariance
-    best = fitWithCov(best$TimeSplits)
+    best = fitFinal(best$TimeSplits)
   }
 
   best

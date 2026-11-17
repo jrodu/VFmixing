@@ -14,7 +14,8 @@ getEstimatedTrajectories_OneShot(
   quad_nodes = 20,
   patience = NULL,
   undersmooth = T,
-  refine = 1
+  refine = 1,
+  return_cov = TRUE
 )
 }
 \arguments{
@@ -43,6 +44,9 @@ criterion's choice. See Details.}
 
 \item{refine}{a positive whole number. Each region of the selected trajectory is split into this many equal
 regions and refit. The default, 1, keeps the selected regions. See Details.}
+
+\item{return_cov}{a boolean. If FALSE, the returned trajectory has no covariance (\code{Cov} is NULL), which saves its
+one dense covariance computation. The bootstrap uses this for its replicates, which only need their nodes.}
 }
 \value{
 an EstimatedTrajectory object.
