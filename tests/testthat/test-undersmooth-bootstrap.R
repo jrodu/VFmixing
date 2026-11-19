@@ -385,3 +385,39 @@ test_that("objects named in worker_globals are copied to the workers", {
                "not found")
   expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, bootstrap = TRUE, worker_globals = 3), "worker_globals")
 })
+
+test_that("a worker that dies is replaced and its jobs run again", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = NULL)
+  on.exit(options(old))
+  marker = tempfile()
+  die_once = function(i){
+    if(i == 2 && !file.exists(marker)){
+      file.create(marker)
+      quit(save = "no", status = 1)   # the worker process dies, as if killed for memory
+    }
+    i*10
+  }
+  expect_warning(res <- runInParallel(1:4, die_once, cores = 2), "worker failed")
+  expect_equal(unlist(res), c(10, 20, 30, 40))
+
+  # A failure that keeps happening stops with an error instead of looping
+  always_die = function(i){quit(save = "no", status = 1)}
+  expect_error(suppressWarnings(runInParallel(1:2, always_die, cores = 2)), "failed")
+})
+
+test_that("workers are restarted after worker_recycle jobs each", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = NULL)
+  on.exit(options(old))
+  kept = unlist(runInParallel(1:4, function(i){Sys.getpid()}, cores = 2))
+  recycled = unlist(runInParallel(1:4, function(i){Sys.getpid()}, cores = 2, worker_recycle = 1))
+  expect_length(unique(kept), 2)
+  expect_length(unique(recycled), 4)
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, bootstrap = TRUE, worker_recycle = 0), "worker_recycle")
+})
+
+test_that("the progress lines show the process's memory", {
+  job = parallelJob(c(5, 7), function(x){x + 1}, progress = TRUE, label = "Test job", limit_threads = FALSE)
+  expect_message(job(1), "Test job 1/2 done [(][0-9.]+ s, process memory [0-9.]+ GB")
+})

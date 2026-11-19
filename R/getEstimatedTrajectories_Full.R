@@ -91,6 +91,13 @@
 #' finishes. In a terminal or batch log these appear as they happen; in RStudio
 #' and other consoles, the lines from separate R processes aren't shown, but
 #' the start and end lines are.
+#'
+#' The separate processes run one replicate each at a time, and the run
+#' survives a process dying (for example, killed for running out of memory):
+#' the processes are restarted and the replicates they were running are run
+#' again, with a warning. Each progress line shows the process's memory, and
+#' `worker_recycle` restarts the processes regularly if their memory creeps up
+#' over a long bootstrap.
 
 #'
 #' Because the conditional means are fit without noise, the selection part
@@ -122,6 +129,10 @@
 #' @param worker_setup NULL or a function with no arguments, run once in each separate R process the replicates
 #' use (on Windows and inside RStudio) before they start. Use it to rebuild what can't be copied to those
 #' processes, such as functions compiled with Rcpp. See Details.
+#' @param worker_recycle NULL or a positive whole number. If set, the separate R processes the replicates run on are
+#' restarted after each has run this many replicates, which hands back all the memory they hold (each restart
+#' copies the global objects again and reruns `worker_setup`). NULL (the default) keeps them for the whole bootstrap.
+#' See Details.
 #' @param quiet a boolean. If TRUE, the progress output of the estimation functions is suppressed.
 #'
 #' @returns a list with:
@@ -148,7 +159,7 @@
 getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = NULL, traj_nsplits = 100,
                                          path_method = "FullFours", V_Smooth = F, Model_Selection_Type = "BIC",
                                          patience = 10, undersmooth = T, traj_refine = 1, bootstrap = F, B = 20,
-                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, worker_setup = NULL, worker_globals = NULL, quiet = F){
+                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, worker_setup = NULL, worker_globals = NULL, worker_recycle = NULL, quiet = F){
 
   checkCores(cores)
 
@@ -157,6 +168,11 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
 
   if(!is.null(worker_globals) && !is.character(worker_globals)){
     stop("worker_globals must be NULL or a character vector of object names.", call. = FALSE)
+  }
+
+  if(!is.null(worker_recycle) && (length(worker_recycle) != 1 || !is.numeric(worker_recycle) || worker_recycle < 1 ||
+                                  worker_recycle != round(worker_recycle))){
+    stop("worker_recycle must be NULL or a positive whole number.", call. = FALSE)
   }
 
   if(!is.null(worker_setup) && !is.function(worker_setup)){
@@ -269,7 +285,8 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   boot_start = Sys.time()
 
   replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields, progress = !quiet, label = "Bootstrap replicate",
-                             worker_setup = worker_setup, worker_globals = worker_globals, globals_env = caller_env)
+                             worker_setup = worker_setup, worker_globals = worker_globals, globals_env = caller_env,
+                             worker_recycle = worker_recycle)
 
   if(!quiet){
     message(sprintf("[%s] Bootstrap done in %.1f min", format(Sys.time(), "%H:%M:%S"),
@@ -406,7 +423,7 @@ checkCores = function(cores){
 # cluster: the workers load VFmixing from the same libraries, and any global
 # variables and functions that baseVectorFields uses are copied to them.
 runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job", worker_setup = NULL,
-                         worker_globals = NULL, globals_env = parent.frame()){
+                         worker_globals = NULL, globals_env = parent.frame(), worker_recycle = NULL){
 
   cores = min(cores, length(X))
   job = parallelJob(X, FUN, progress, label, limit_threads = cores > 1)
@@ -423,19 +440,43 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
     return(forkWithFallback(seq_along(X), job, cores))
   }
 
-  # Separate R processes, started with what they need from the first
-  # instruction: one math-library thread each (a new process's OpenBLAS would
-  # otherwise start a thread per core on the whole machine, and the workers
-  # would fight over the cores), and this session's package libraries (so they
-  # load the same VFmixing). New processes inherit these environment
-  # variables; this session's own values are restored once they are running.
-  # Their output (the progress lines) goes to this session's standard output,
-  # which a terminal or batch log shows.
+  if(length(worker_globals) > 0){
+    missing = worker_globals[!vapply(worker_globals, exists, logical(1), envir = globals_env)]
+    if(length(missing) > 0){
+      stop("worker_globals not found: ", paste(missing, collapse = ", "), call. = FALSE)
+    }
+  }
+
+  # The global objects the field function and the setup function use
+  globals = unique(c(if(!is.null(baseVectorFields)) fieldGlobals(baseVectorFields),
+                     if(!is.null(worker_setup)) fieldGlobals(worker_setup)))
+
+  startWorkers = function(){
+    startSocketWorkers(cores, job, globals, worker_globals, globals_env, worker_setup)
+  }
+
+  runSocketRounds(seq_along(X), startWorkers, worker_recycle, label)
+
+}
+
+# Start `cores` separate R processes ready to run job(i): started with one
+# math-library thread each (a new process's OpenBLAS would otherwise start a
+# thread per core on the whole machine, and the workers would fight over the
+# cores) and with this session's package libraries (so they load the same
+# VFmixing); given the global objects and the job once; and set up with
+# worker_setup. New processes inherit the environment variables, and this
+# session's own values are restored once they are running. Their output (the
+# progress lines) goes to this session's standard output, which a terminal or
+# batch log shows.
+startSocketWorkers = function(cores, job, globals, worker_globals, globals_env, worker_setup){
+
   restore_env = setEnvTemporarily(c(OMP_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1", MKL_NUM_THREADS = "1",
                                     VECLIB_MAXIMUM_THREADS = "1",
                                     R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep)))
   cl = tryCatch(parallel::makeCluster(cores, outfile = ""), finally = restore_env())
-  on.exit(parallel::stopCluster(cl), add = TRUE)
+
+  ok = FALSE
+  on.exit(if(!ok) stopWorkers(cl))
 
   # The same library paths, set in each worker too (with a function that
   # doesn't need VFmixing loaded to run)
@@ -443,38 +484,96 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
   environment(set_paths) = baseenv()
   parallel::clusterCall(cl, set_paths, .libPaths())
 
-  # The global objects the field function and the setup function use
-  globals = unique(c(if(!is.null(baseVectorFields)) fieldGlobals(baseVectorFields),
-                     if(!is.null(worker_setup)) fieldGlobals(worker_setup)))
   if(length(globals) > 0){
     parallel::clusterExport(cl, globals, envir = globalenv())
   }
 
-  # Anything the workers must build themselves, such as compiled (Rcpp)
-  # functions, whose pointers into compiled code don't survive being copied
   # Objects named explicitly, found where the bootstrap was called
   if(length(worker_globals) > 0){
-    missing = worker_globals[!vapply(worker_globals, exists, logical(1), envir = globals_env)]
-    if(length(missing) > 0){
-      stop("worker_globals not found: ", paste(missing, collapse = ", "), call. = FALSE)
-    }
     parallel::clusterExport(cl, worker_globals, envir = globals_env)
   }
 
+  # Anything the workers must build themselves, such as compiled (Rcpp)
+  # functions, whose pointers into compiled code don't survive being copied
   if(!is.null(worker_setup)){
     parallel::clusterCall(cl, worker_setup)
   }
 
   # Send the job, with everything it carries (the data, the fitted path), to
-  # each worker once, then hand out only the replicate numbers: sending it
-  # with every batch would copy it again each time, in both processes
+  # each worker once; after that only job numbers are sent
   install_job = function(job){assign(".VFmixing_job", job, envir = globalenv()); invisible(NULL)}
   environment(install_job) = baseenv()
   parallel::clusterCall(cl, install_job, job)
 
+  ok = TRUE
+  cl
+
+}
+
+# Stop separate R processes, closing every connection even when some have died
+# (stopCluster() stops at the first dead one, leaving the others open).
+stopWorkers = function(cl){
+
+  try(parallel::stopCluster(cl), silent = TRUE)
+  for(node in cl){
+    try(close(node$con), silent = TRUE)
+  }
+  invisible(NULL)
+
+}
+
+# Run job(i) for every i on separate R processes, one job per process at a
+# time (in rounds, one job per process), keeping each result as its round
+# finishes. If a process dies (for example, killed for running out of
+# memory), the processes are restarted and that round's jobs are run again,
+# instead of losing the run. With worker_recycle = k, the processes are
+# restarted after each has run k jobs, which hands back everything they hold.
+runSocketRounds = function(X, startWorkers, worker_recycle = NULL, label = "Job", max_failures = 3){
+
+  results = vector("list", length(X))
+  todo = seq_along(X)
+  cl = NULL
+  rounds_on_workers = 0
+  failures = 0
+  on.exit(if(!is.null(cl)) stopWorkers(cl))
+
   run_job = function(i){get(".VFmixing_job", envir = globalenv())(i)}
   environment(run_job) = baseenv()
-  parallel::parLapplyLB(cl, seq_along(X), run_job)
+
+  while(length(todo) > 0){
+
+    if(!is.null(cl) && !is.null(worker_recycle) && rounds_on_workers >= worker_recycle){
+      stopWorkers(cl)
+      cl = NULL
+    }
+    if(is.null(cl)){
+      cl = startWorkers()
+      rounds_on_workers = 0
+    }
+
+    batch = todo[seq_len(min(length(cl), length(todo)))]
+    out = tryCatch(parallel::clusterApply(cl[seq_along(batch)], X[batch], run_job), error = function(e){e})
+
+    if(inherits(out, "error")){
+      failures = failures + 1
+      stopWorkers(cl)
+      cl = NULL
+      if(failures > max_failures){
+        stop("The parallel workers failed ", failures, " times; the last error was: ", conditionMessage(out),
+             ". If they ran out of memory, use fewer cores or more memory.", call. = FALSE)
+      }
+      warning(label, "s ", paste(unique(range(batch)), collapse = "-"), ": a worker failed (", conditionMessage(out),
+              "; it may have run out of memory). Restarting the workers and running them again.", call. = FALSE)
+      next
+    }
+
+    results[batch] = out
+    todo = setdiff(todo, batch)
+    rounds_on_workers = rounds_on_workers + 1
+
+  }
+
+  results
 
 }
 
@@ -522,12 +621,32 @@ parallelJob = function(X, FUN, progress, label, limit_threads){
     }
     t0 = Sys.time()
     out = FUN(X[[i]])
+    # Hand back the job's temporary memory before the next job
+    invisible(gc(verbose = FALSE))
     if(progress){
-      message(sprintf("[%s] %s %d/%d done (%.1f s)", format(Sys.time(), "%H:%M:%S"), label, i, n,
-                      as.numeric(difftime(Sys.time(), t0, units = "secs"))))
+      message(sprintf("[%s] %s %d/%d done (%.1f s, process memory %s)", format(Sys.time(), "%H:%M:%S"), label, i, n,
+                      as.numeric(difftime(Sys.time(), t0, units = "secs")), processMemory()))
     }
     out
   }
+
+}
+
+# This process's memory in use, as text: its resident size where the system
+# reports it (Linux), otherwise R's own heap.
+processMemory = function(){
+
+  rss = tryCatch({
+    status = readLines("/proc/self/status", warn = FALSE)
+    line = grep("^VmRSS:", status, value = TRUE)
+    as.numeric(gsub("[^0-9]", "", line))/2^20   # kB to GB
+  }, error = function(e){NA_real_}, warning = function(w){NA_real_})
+
+  if(length(rss) == 1 && !is.na(rss)){
+    return(sprintf("%.1f GB", rss))
+  }
+  g = gc(verbose = FALSE)
+  sprintf("%.1f GB R heap", sum(g[, 2])/1024)
 
 }
 
