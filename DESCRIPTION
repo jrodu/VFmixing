@@ -10,7 +10,6 @@ Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2
 Suggests:
     akima,
-    codetools,
     gganimate,
     leaflet,
     leaflet.extras2,
@@ -23,6 +22,7 @@ Suggests:
     waiter
 Config/testthat/edition: 3
 Imports: 
+    codetools,
     cubature,
     dplyr,
     fastmatrix,

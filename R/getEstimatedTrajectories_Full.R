@@ -657,14 +657,10 @@ whereDefined = function(name, env){
 
 }
 
-# The names a function uses that aren't its own arguments or local variables:
-# codetools when available, otherwise every name in its body.
+# The names a function uses that aren't its own arguments or local variables.
 usedNames = function(f){
 
-  if(requireNamespace("codetools", quietly = TRUE)){
-    return(codetools::findGlobals(f))
-  }
-  setdiff(unique(all.names(body(f))), names(formals(f)))
+  codetools::findGlobals(f)
 
 }
 
