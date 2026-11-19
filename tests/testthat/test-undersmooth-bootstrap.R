@@ -343,3 +343,45 @@ test_that("setting environment variables temporarily restores them", {
   expect_true(is.na(Sys.getenv("VFMIXING_TEST_B", unset = NA)))
   Sys.unsetenv("VFMIXING_TEST_A")
 })
+
+test_that("workspace objects are found for field functions defined anywhere", {
+  env = globalenv()
+  assign("vf_cube_test", matrix(c(0, 1, 1, 0), 2), envir = env)
+  assign("vf_lookup_test", function(){vf_cube_test}, envir = env)
+  environment(env$vf_lookup_test) = env
+  on.exit(rm(vf_cube_test, vf_lookup_test, envir = env))
+
+  # Defined inside a function (a closure), using a workspace object by name
+  make_field = function(){
+    scale = 1
+    function(t, curPos){scale*vf_cube_test}
+  }
+  environment(make_field) = env
+  expect_equal(fieldGlobals(make_field()), "vf_cube_test")
+
+  # A closure with a local helper that uses a workspace helper
+  make_field2 = function(){
+    helper = function(){vf_lookup_test()}
+    function(t, curPos){helper()}
+  }
+  environment(make_field2) = env
+  expect_setequal(fieldGlobals(make_field2()), c("vf_lookup_test", "vf_cube_test"))
+
+  # Package and base functions are not followed
+  expect_length(fieldGlobals(stats::median), 0)
+})
+
+test_that("objects named in worker_globals are copied to the workers", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = "socket")
+  on.exit(options(old))
+  run = function(){
+    local_cube = 41   # not in the workspace: found where runInParallel is called
+    runInParallel(1:2, function(i){get("local_cube", envir = globalenv()) + 1}, cores = 2,
+                  worker_globals = "local_cube", globals_env = environment())
+  }
+  expect_equal(unlist(run()), c(42, 42))
+  expect_error(runInParallel(1:2, identity, cores = 2, worker_globals = "no_such_object_xyz", globals_env = environment()),
+               "not found")
+  expect_error(getEstimatedTrajectories_Full(axisData(), axisFields, bootstrap = TRUE, worker_globals = 3), "worker_globals")
+})

@@ -65,8 +65,11 @@
 #' the processes don't compete for the cores) and with this session's package
 #' libraries. They load VFmixing from the installed package (so install the
 #' version you are using; a `devtools::load_all()` copy isn't seen by them),
-#' and the global variables and functions that `baseVectorFields` uses are
-#' copied to them. On a cluster scheduler, request as many cores as you pass.
+#' and the global variables and functions that `baseVectorFields` uses by name
+#' are found and copied to them (wherever the function was defined, and through
+#' the functions it calls). Name anything else they need, such as objects whose
+#' names are built at run time, in `worker_globals`. On a cluster scheduler,
+#' request as many cores as you pass.
 #'
 #' Compiled code can't be copied to other processes: if `baseVectorFields`
 #' uses a function compiled with Rcpp (`Rcpp::sourceCpp()` or
@@ -112,6 +115,10 @@
 #' @param quad_nodes a positive integer. Passed to [getEstimatedTrajectories_OneShot()].
 #' @param t_grid_size a positive number. The time grid for the pointwise variances in `Variance$Pointwise`.
 #' @param cores a positive whole number. The number of cores to run the bootstrap replicates on. See Details.
+#' @param worker_globals NULL or a character vector of object names, copied to each separate R process the
+#' replicates use. Objects that `baseVectorFields` (or `worker_setup`) uses by name are found and copied
+#' automatically; list anything else here, such as objects whose names are built at run time. They are
+#' looked up where this function is called. See Details.
 #' @param worker_setup NULL or a function with no arguments, run once in each separate R process the replicates
 #' use (on Windows and inside RStudio) before they start. Use it to rebuild what can't be copied to those
 #' processes, such as functions compiled with Rcpp. See Details.
@@ -141,9 +148,16 @@
 getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = NULL, traj_nsplits = 100,
                                          path_method = "FullFours", V_Smooth = F, Model_Selection_Type = "BIC",
                                          patience = 10, undersmooth = T, traj_refine = 1, bootstrap = F, B = 20,
-                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, worker_setup = NULL, quiet = F){
+                                         quad_nodes = 20, t_grid_size = 0.01, cores = 1, worker_setup = NULL, worker_globals = NULL, quiet = F){
 
   checkCores(cores)
+
+  # Where the call was made, to find worker_globals
+  caller_env = parent.frame()
+
+  if(!is.null(worker_globals) && !is.character(worker_globals)){
+    stop("worker_globals must be NULL or a character vector of object names.", call. = FALSE)
+  }
 
   if(!is.null(worker_setup) && !is.function(worker_setup)){
     stop("worker_setup must be NULL or a function with no arguments.", call. = FALSE)
@@ -255,7 +269,7 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
   boot_start = Sys.time()
 
   replicates = runInParallel(seq_len(B), runReplicate, cores, baseVectorFields, progress = !quiet, label = "Bootstrap replicate",
-                             worker_setup = worker_setup)
+                             worker_setup = worker_setup, worker_globals = worker_globals, globals_env = caller_env)
 
   if(!quiet){
     message(sprintf("[%s] Bootstrap done in %.1f min", format(Sys.time(), "%H:%M:%S"),
@@ -391,7 +405,8 @@ checkCores = function(cores){
 # (parallel::mclapply). On Windows, which can't fork, it starts a socket
 # cluster: the workers load VFmixing from the same libraries, and any global
 # variables and functions that baseVectorFields uses are copied to them.
-runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job", worker_setup = NULL){
+runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALSE, label = "Job", worker_setup = NULL,
+                         worker_globals = NULL, globals_env = parent.frame()){
 
   cores = min(cores, length(X))
   job = parallelJob(X, FUN, progress, label, limit_threads = cores > 1)
@@ -437,6 +452,15 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
 
   # Anything the workers must build themselves, such as compiled (Rcpp)
   # functions, whose pointers into compiled code don't survive being copied
+  # Objects named explicitly, found where the bootstrap was called
+  if(length(worker_globals) > 0){
+    missing = worker_globals[!vapply(worker_globals, exists, logical(1), envir = globals_env)]
+    if(length(missing) > 0){
+      stop("worker_globals not found: ", paste(missing, collapse = ", "), call. = FALSE)
+    }
+    parallel::clusterExport(cl, worker_globals, envir = globals_env)
+  }
+
   if(!is.null(worker_setup)){
     parallel::clusterCall(cl, worker_setup)
   }
@@ -565,29 +589,82 @@ forkWithFallback = function(X, FUN, cores){
 # top level uses, followed through the global functions it calls.
 fieldGlobals = function(f){
 
-  if(!is.function(f) || !identical(environment(f), globalenv()) || !requireNamespace("codetools", quietly = TRUE)){
+  if(!is.function(f) || is.primitive(f)){
     return(character(0))
   }
 
   found = character(0)
   queue = list(f)
+  scanned = list()
 
   while(length(queue) > 0){
     g = queue[[1]]
     queue = queue[-1]
-    names_g = codetools::findGlobals(g)
-    names_g = names_g[vapply(names_g, exists, logical(1), envir = globalenv(), inherits = FALSE)]
-    new = setdiff(names_g, found)
-    found = c(found, new)
-    for(nm in new){
-      obj = get(nm, envir = globalenv())
-      if(is.function(obj) && identical(environment(obj), globalenv())){
-        queue[[length(queue) + 1]] = obj
+
+    if(any(vapply(scanned, identical, logical(1), g)) || !reachesWorkspace(environment(g))){
+      next
+    }
+    scanned[[length(scanned) + 1]] = g
+
+    for(nm in usedNames(g)){
+      home = whereDefined(nm, environment(g))
+      if(is.null(home)){
+        next
+      }
+      if(identical(home, globalenv())){
+        # Lives in the workspace: copy it (and follow it if it is a function)
+        if(!(nm %in% found)){
+          found = c(found, nm)
+          obj = get(nm, envir = globalenv())
+          if(is.function(obj) && !is.primitive(obj)) queue[[length(queue) + 1]] = obj
+        }
+      } else{
+        # Travels with the function's own environment, but if it is a function
+        # it may use workspace objects itself
+        obj = get(nm, envir = home)
+        if(is.function(obj) && !is.primitive(obj)) queue[[length(queue) + 1]] = obj
       }
     }
   }
 
   found
+
+}
+
+# Whether an environment leads to the workspace (user code) rather than to a
+# package or base R.
+reachesWorkspace = function(env){
+
+  while(!identical(env, emptyenv())){
+    if(identical(env, globalenv())) return(TRUE)
+    if(isNamespace(env) || identical(env, baseenv())) return(FALSE)
+    env = parent.env(env)
+  }
+  FALSE
+
+}
+
+# The environment, between env and the workspace, where a name is defined
+# (NULL if it isn't defined there).
+whereDefined = function(name, env){
+
+  while(!identical(env, emptyenv())){
+    if(exists(name, envir = env, inherits = FALSE)) return(env)
+    if(identical(env, globalenv())) return(NULL)
+    env = parent.env(env)
+  }
+  NULL
+
+}
+
+# The names a function uses that aren't its own arguments or local variables:
+# codetools when available, otherwise every name in its body.
+usedNames = function(f){
+
+  if(requireNamespace("codetools", quietly = TRUE)){
+    return(codetools::findGlobals(f))
+  }
+  setdiff(unique(all.names(body(f))), names(formals(f)))
 
 }
 
