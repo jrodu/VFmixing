@@ -22,6 +22,7 @@ getEstimatedTrajectories_Full(
   cores = 1,
   worker_setup = NULL,
   worker_globals = NULL,
+  worker_recycle = NULL,
   quiet = F
 )
 }
@@ -66,6 +67,11 @@ processes, such as functions compiled with Rcpp. See Details.}
 replicates use. Objects that \code{baseVectorFields} (or \code{worker_setup}) uses by name are found and copied
 automatically; list anything else here, such as objects whose names are built at run time. They are
 looked up where this function is called. See Details.}
+
+\item{worker_recycle}{NULL or a positive whole number. If set, the separate R processes the replicates run on are
+restarted after each has run this many replicates, which hands back all the memory they hold (each restart
+copies the global objects again and reruns \code{worker_setup}). NULL (the default) keeps them for the whole bootstrap.
+See Details.}
 
 \item{quiet}{a boolean. If TRUE, the progress output of the estimation functions is suppressed.}
 }
@@ -175,6 +181,13 @@ With \code{quiet = FALSE}, a timestamped line is printed as each replicate
 finishes. In a terminal or batch log these appear as they happen; in RStudio
 and other consoles, the lines from separate R processes aren't shown, but
 the start and end lines are.
+
+The separate processes run one replicate each at a time, and the run
+survives a process dying (for example, killed for running out of memory):
+the processes are restarted and the replicates they were running are run
+again, with a warning. Each progress line shows the process's memory, and
+\code{worker_recycle} restarts the processes regularly if their memory creeps up
+over a long bootstrap.
 
 Because the conditional means are fit without noise, the selection part
 settles with few replicates: 20 is usually plenty. This part still conditions
