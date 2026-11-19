@@ -68,3 +68,20 @@ test_that("every search starts from a single region", {
     expect_no_error(quietly(f(data, 10)))
   }
 })
+
+test_that("fitted paths no longer store the full coefficient covariance, and getPathFullCov() rebuilds it", {
+  # The bundled example still has the FullCov that fits used to store
+  old = ExEstPath_FullRegression
+  expect_false(is.null(old$FullCov))
+  expect_equal(getPathFullCov(old), old$FullCov, tolerance = 1e-10)
+
+  new = runEstPathStep_FullRegression(ExData, old$TimeSplits, V_Smooth = FALSE)
+  expect_null(new$FullCov)
+  full = getPathFullCov(new)
+  for(r in seq_along(new$Path)){
+    for(d in seq_along(full)){
+      expect_equal(new$Cov[[r]][[d]], full[[d]][1:4 + 4*(r - 1), 1:4 + 4*(r - 1)], tolerance = 1e-10)
+    }
+  }
+  expect_error(getPathFullCov(ExEstPath_ByFours), "covariance")
+})

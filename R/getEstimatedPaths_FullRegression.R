@@ -55,13 +55,15 @@ runEstPathStep_FullRegression = function(Data, time_splits, V_Smooth = T){
   
   Error_mat = cbind(t = Data$t,(Data[,-1] - est_pos)^2)
 
-  cur_full_cov_list = lapply(free_cov, FUN = function(x){trans_mat %*% x %*% t(trans_mat)})
+  # Each region's 4 x 4 covariance blocks, without forming the full covariance
+  # of all the path coefficients (whose size grows with the square of the
+  # number of regions; getPathFullCov() gives it when needed)
   
-  restricted_cov_perdim = lapply(cur_full_cov_list, FUN = function(cov){lapply(as.list(1:(length(time_splits) - 1)), FUN = function(x){cov[1:4 + 4*(x-1),1:4 + 4*(x-1)]})})
+  restricted_cov_perdim = lapply(free_cov, FUN = function(cov){pathCovBlocks(trans_mat, cov)})
   cov_list = lapply(as.list(1:(length(time_splits)-1)), FUN = function(x){lapply(restricted_cov_perdim, `[[`, x)})
   sigma2_list = replicate(length(time_splits)-1, list(cur_sigma2))
   
-  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = length(time_splits)-1, PosSplits = pos_splits, Cov = cov_list, Sigma2 = sigma2_list, SplitLabels = split_labels, FullCov = cur_full_cov_list, Free_Parameters = free_coef, Free_Parameter_Cov = free_cov)
+  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = length(time_splits)-1, PosSplits = pos_splits, Cov = cov_list, Sigma2 = sigma2_list, SplitLabels = split_labels, Free_Parameters = free_coef, Free_Parameter_Cov = free_cov)
   
 }
 

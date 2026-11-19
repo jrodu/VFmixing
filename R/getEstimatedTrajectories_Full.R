@@ -465,7 +465,16 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
     parallel::clusterCall(cl, worker_setup)
   }
 
-  parallel::parLapplyLB(cl, seq_along(X), job)
+  # Send the job, with everything it carries (the data, the fitted path), to
+  # each worker once, then hand out only the replicate numbers: sending it
+  # with every batch would copy it again each time, in both processes
+  install_job = function(job){assign(".VFmixing_job", job, envir = globalenv()); invisible(NULL)}
+  environment(install_job) = baseenv()
+  parallel::clusterCall(cl, install_job, job)
+
+  run_job = function(i){get(".VFmixing_job", envir = globalenv())(i)}
+  environment(run_job) = baseenv()
+  parallel::parLapplyLB(cl, seq_along(X), run_job)
 
 }
 

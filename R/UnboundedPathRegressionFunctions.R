@@ -148,3 +148,46 @@ runUnboundedCubicSplineRegression_Path = function(Data, dim, time_splits, split_
   
 }
 
+
+# Each region's 4 x 4 block of trans_mat %*% cov %*% t(trans_mat), the
+# covariance of one dimension's path coefficients, without forming the whole
+# matrix.
+pathCovBlocks = function(trans_mat, cov){
+
+  W = trans_mat %*% cov
+  lapply(seq_len(nrow(trans_mat)/4), function(r){
+    rows = 1:4 + 4*(r - 1)
+    W[rows, , drop = FALSE] %*% t(trans_mat[rows, , drop = FALSE])
+  })
+
+}
+
+#' Full Covariance of the Path Coefficients
+#'
+#' @description
+#' The covariance of all of a path's cubic coefficients, across every region,
+#' for each dimension. Fitted paths keep only each region's 4 x 4 block (`Cov`)
+#' and the covariance of the free parameters (`Free_Parameter_Cov`), because
+#' this full matrix grows with the square of the number of regions; this
+#' computes it from them when it is needed.
+#'
+#' @param EstPath an EstimatedPath object with a covariance structure (FullRegression, Projection or FullFours).
+#'
+#' @returns a list with one matrix per dimension: the covariance of that dimension's cubic coefficients, ordered by
+#' region and then by coefficient (four per region).
+#' @export
+#'
+#' @examples
+#' full_cov = getPathFullCov(ExEstPath_FullRegression)
+#' dim(full_cov[[1]])
+#'
+getPathFullCov = function(EstPath){
+
+  if(is.null(EstPath$Free_Parameter_Cov)){
+    stop("EstPath has no covariance structure. Use a FullRegression, Projection or FullFours path.", call. = FALSE)
+  }
+
+  trans_mat = constructUnboundedCubicSplineTransitionMatrix_Path(EstPath$TimeSplits, inferPathVSmooth(EstPath, default = FALSE))
+  lapply(EstPath$Free_Parameter_Cov, function(cov){trans_mat %*% tcrossprod(cov, trans_mat)})
+
+}
