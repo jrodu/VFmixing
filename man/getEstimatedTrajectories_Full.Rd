@@ -21,6 +21,7 @@ getEstimatedTrajectories_Full(
   t_grid_size = 0.01,
   cores = 1,
   worker_setup = NULL,
+  worker_globals = NULL,
   quiet = F
 )
 }
@@ -60,6 +61,11 @@ regions and refit. The default, 1, keeps the selected regions. See Details.}
 \item{worker_setup}{NULL or a function with no arguments, run once in each separate R process the replicates
 use (on Windows and inside RStudio) before they start. Use it to rebuild what can't be copied to those
 processes, such as functions compiled with Rcpp. See Details.}
+
+\item{worker_globals}{NULL or a character vector of object names, copied to each separate R process the
+replicates use. Objects that \code{baseVectorFields} (or \code{worker_setup}) uses by name are found and copied
+automatically; list anything else here, such as objects whose names are built at run time. They are
+looked up where this function is called. See Details.}
 
 \item{quiet}{a boolean. If TRUE, the progress output of the estimation functions is suppressed.}
 }
@@ -143,8 +149,11 @@ system, with nothing to set up: each starts with one math-library thread (so
 the processes don't compete for the cores) and with this session's package
 libraries. They load VFmixing from the installed package (so install the
 version you are using; a \code{devtools::load_all()} copy isn't seen by them),
-and the global variables and functions that \code{baseVectorFields} uses are
-copied to them. On a cluster scheduler, request as many cores as you pass.
+and the global variables and functions that \code{baseVectorFields} uses by name
+are found and copied to them (wherever the function was defined, and through
+the functions it calls). Name anything else they need, such as objects whose
+names are built at run time, in \code{worker_globals}. On a cluster scheduler,
+request as many cores as you pass.
 
 Compiled code can't be copied to other processes: if \code{baseVectorFields}
 uses a function compiled with Rcpp (\code{Rcpp::sourceCpp()} or
