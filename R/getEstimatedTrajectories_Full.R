@@ -60,32 +60,35 @@
 #' drawn before any of them run, so the result is the same for any number of
 #' cores, and a seed gives the same answer on any machine.
 #'
-#' * On Linux and macOS, outside RStudio, the replicates run in forked
-#'   processes ([parallel::mclapply()]). A forked process can need as much
-#'   memory as the whole R session when it starts, so request enough memory for
-#'   about `cores` copies of the session. If the processes can't be started for
-#'   lack of memory, fewer are used (halving down to one), with a warning; if a
-#'   worker dies while running, its replicates are rerun in the session.
-#' * On Windows, which can't fork, and inside RStudio, where forked processes
-#'   can hang, the replicates run in separate R processes (a socket cluster).
-#'   These load VFmixing from the installed package (so install the version you
-#'   are using; a `devtools::load_all()` copy isn't seen by them), and the global
-#'   variables and functions that `baseVectorFields` uses are copied to them.
-#'   `options(VFmixing.parallel = "socket")` or `"fork"` overrides the choice.
-#'   Compiled code can't be copied to these processes: if `baseVectorFields`
-#'   uses a function compiled with Rcpp (`Rcpp::sourceCpp()` or
-#'   `Rcpp::cppFunction()`), rebuild it in each of them with `worker_setup`,
-#'   for example `worker_setup = function(){Rcpp::sourceCpp("interp.cpp")}`
-#'   (it runs after the global objects are copied, so what it defines replaces
-#'   them). Functions from installed packages are fine, compiled or not.
+#' The replicates run in separate R processes (a socket cluster), on any
+#' system, with nothing to set up: each starts with one math-library thread (so
+#' the processes don't compete for the cores) and with this session's package
+#' libraries. They load VFmixing from the installed package (so install the
+#' version you are using; a `devtools::load_all()` copy isn't seen by them),
+#' and the global variables and functions that `baseVectorFields` uses are
+#' copied to them. On a cluster scheduler, request as many cores as you pass.
 #'
-#' Each worker limits the math library to one thread (fully so if the
-#' RhpcBLASctl package is installed), so the workers don't compete for the
-#' cores; on a cluster scheduler, request as many cores as you pass. With
-#' `quiet = FALSE`, a timestamped line is printed as each replicate finishes. In
-#' a terminal or batch log these appear as they happen; in RStudio and other
-#' consoles, the lines from separate R processes aren't shown, but the start and
-#' end lines are.
+#' Compiled code can't be copied to other processes: if `baseVectorFields`
+#' uses a function compiled with Rcpp (`Rcpp::sourceCpp()` or
+#' `Rcpp::cppFunction()`), rebuild it in each of them with `worker_setup`, for
+#' example `worker_setup = function(){Rcpp::sourceCpp("interp.cpp")}` (it runs
+#' after the global objects are copied, so what it defines replaces them).
+#' Functions from installed packages are fine, compiled or not.
+#'
+#' On Linux and macOS, `options(VFmixing.parallel = "fork")` uses forked
+#' processes ([parallel::mclapply()]) instead: copies of this session, which
+#' start faster and need no `worker_setup`, but can hang silently depending on
+#' how R and its math library were built (for example after threaded OpenBLAS
+#' has run, or inside RStudio). A forked process can need as much memory as the
+#' whole session, so request enough for about `cores` copies; if they can't be
+#' started for lack of memory, fewer are used (halving down to one), with a
+#' warning, and if a worker dies, its replicates are rerun in the session.
+#'
+#' With `quiet = FALSE`, a timestamped line is printed as each replicate
+#' finishes. In a terminal or batch log these appear as they happen; in RStudio
+#' and other consoles, the lines from separate R processes aren't shown, but
+#' the start and end lines are.
+
 #'
 #' Because the conditional means are fit without noise, the selection part
 #' settles with few replicates: 20 is usually plenty. This part still conditions
@@ -278,8 +281,8 @@ getEstimatedTrajectories_Full = function(Data, baseVectorFields, path_nsplits = 
          if(socket && compiled)
            stringr::str_c(" The parallel workers are separate R processes, and compiled code that baseVectorFields uses ",
                           "(such as an Rcpp function) can't be copied to them. Rebuild it in each worker with worker_setup, ",
-                          "for example worker_setup = function(){Rcpp::sourceCpp(\"your_file.cpp\")}, or use forked workers ",
-                          "outside RStudio (options(VFmixing.parallel = \"fork\")).")
+                          "for example worker_setup = function(){Rcpp::sourceCpp(\"your_file.cpp\")}, or, on Linux or macOS, use forked ",
+                          "workers (options(VFmixing.parallel = \"fork\")).")
          else if(socket)
            " The parallel workers use the installed VFmixing, so check it is the version you are using.",
          call. = FALSE)
@@ -405,12 +408,25 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
     return(forkWithFallback(seq_along(X), job, cores))
   }
 
-  # Separate R processes: their output (the progress lines) goes to this
-  # session's standard output, which a terminal or batch log shows
-  cl = parallel::makeCluster(cores, outfile = "")
+  # Separate R processes, started with what they need from the first
+  # instruction: one math-library thread each (a new process's OpenBLAS would
+  # otherwise start a thread per core on the whole machine, and the workers
+  # would fight over the cores), and this session's package libraries (so they
+  # load the same VFmixing). New processes inherit these environment
+  # variables; this session's own values are restored once they are running.
+  # Their output (the progress lines) goes to this session's standard output,
+  # which a terminal or batch log shows.
+  restore_env = setEnvTemporarily(c(OMP_NUM_THREADS = "1", OPENBLAS_NUM_THREADS = "1", MKL_NUM_THREADS = "1",
+                                    VECLIB_MAXIMUM_THREADS = "1",
+                                    R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep)))
+  cl = tryCatch(parallel::makeCluster(cores, outfile = ""), finally = restore_env())
   on.exit(parallel::stopCluster(cl), add = TRUE)
 
-  parallel::clusterCall(cl, function(paths){.libPaths(paths); invisible(NULL)}, .libPaths())
+  # The same library paths, set in each worker too (with a function that
+  # doesn't need VFmixing loaded to run)
+  set_paths = function(paths){.libPaths(paths); invisible(NULL)}
+  environment(set_paths) = baseenv()
+  parallel::clusterCall(cl, set_paths, .libPaths())
 
   # The global objects the field function and the setup function use
   globals = unique(c(if(!is.null(baseVectorFields)) fieldGlobals(baseVectorFields),
@@ -429,24 +445,33 @@ runInParallel = function(X, FUN, cores, baseVectorFields = NULL, progress = FALS
 
 }
 
-# How to run in parallel: "fork" (Linux and macOS) or "socket" (separate R
-# processes). Sockets on Windows, which can't fork, and inside RStudio, where
-# forked processes can hang. options(VFmixing.parallel = "socket") or "fork"
-# overrides the choice (fork is never used on Windows).
+# How to run in parallel: "socket" (separate R processes, the default) or
+# "fork". Forked processes are copies of this session, which is faster to start
+# but can hang silently depending on how R and its math library were built (for
+# example after threaded OpenBLAS has run, or inside RStudio), so they are only
+# used on request: options(VFmixing.parallel = "fork"). Never on Windows, which
+# can't fork.
 parallelType = function(){
 
-  choice = getOption("VFmixing.parallel", "auto")
+  if(.Platform$OS.type != "windows" && identical(getOption("VFmixing.parallel"), "fork")){
+    return("fork")
+  }
+  "socket"
 
-  if(.Platform$OS.type == "windows"){
-    return("socket")
+}
+
+# Set environment variables, returning a function that restores the old values.
+setEnvTemporarily = function(values){
+
+  old = Sys.getenv(names(values), unset = NA, names = TRUE)
+  do.call(Sys.setenv, as.list(values))
+
+  function(){
+    for(name in names(old)){
+      if(is.na(old[[name]])) Sys.unsetenv(name) else do.call(Sys.setenv, stats::setNames(list(old[[name]]), name))
+    }
+    invisible(NULL)
   }
-  if(identical(choice, "fork") || identical(choice, "socket")){
-    return(choice)
-  }
-  if(identical(Sys.getenv("RSTUDIO"), "1")){
-    return("socket")
-  }
-  "fork"
 
 }
 
