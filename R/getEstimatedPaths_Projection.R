@@ -116,9 +116,9 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
     tcrossprod(FB, Free_Param_Matrix)
   })
   
-  full_restricted_cov = lapply(free_param_cov, FUN = function(cov){V %*% tcrossprod(cov, V)})
+  # Each region's 4 x 4 covariance blocks, without forming the full covariance (getPathFullCov())
   
-  restricted_cov_perdim = lapply(full_restricted_cov, FUN = function(cov){lapply(as.list(1:n_regions), FUN = function(x){cov[1:4 + 4*(x-1),1:4 + 4*(x-1)]})})
+  restricted_cov_perdim = lapply(free_param_cov, FUN = function(cov){pathCovBlocks(V, cov)})
   
   restricted_cov = lapply(as.list(1:n_regions), FUN = function(x){lapply(restricted_cov_perdim, `[[`, x)})
   
@@ -130,7 +130,7 @@ runEstPathStep_Projection = function(Data, time_splits, cur_unrestricted_coefs, 
   
   pos_splits = unname(table(split_labels_unique) >= 8)
   
-  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = n_regions, PosSplits = pos_splits, Cov = restricted_cov, FullCov = full_restricted_cov, Sigma2 = Sigma2_list, SplitLabels = split_labels, UnrestrictedCoef = unrestricted_coefs_list, UnrestrictedCov = unrestricted_cov, IntegralList = integral_list, Free_Parameters = free_param_coefs, Free_Parameter_Cov = free_param_cov)
+  list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = n_regions, PosSplits = pos_splits, Cov = restricted_cov, Sigma2 = Sigma2_list, SplitLabels = split_labels, UnrestrictedCoef = unrestricted_coefs_list, UnrestrictedCov = unrestricted_cov, IntegralList = integral_list, Free_Parameters = free_param_coefs, Free_Parameter_Cov = free_param_cov)
   
 }
 
@@ -266,7 +266,7 @@ projectionSingleRegion = function(Data, time_splits){
 
   list(Path = EstPath, TimeSplits = time_splits, Error = Error_mat, n_splits = 1,
        PosSplits = unname(table(split_labels_unique) >= 8),
-       Cov = list(unrestricted_cov), FullCov = unrestricted_cov,
+       Cov = list(unrestricted_cov),
        Sigma2 = list(unname(colMeans(Error_mat[,-1]))), SplitLabels = split_labels,
        UnrestrictedCoef = list(coef), UnrestrictedCov = list(unrestricted_cov),
        IntegralList = list(integral_block),
