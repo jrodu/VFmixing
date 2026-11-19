@@ -258,23 +258,13 @@ test_that("forking falls back to fewer cores, and reruns jobs whose worker died"
   expect_error(forkWithFallback(1:4, identity, 4), "something else")
 })
 
-test_that("the parallel type is sockets on Windows and in RStudio, forks otherwise, and can be overridden", {
+test_that("the parallel type is sockets unless forks are requested (never on Windows)", {
   old_opt = options(VFmixing.parallel = NULL)
-  old_env = Sys.getenv("RSTUDIO", unset = NA)
-  on.exit({options(old_opt); if(is.na(old_env)) Sys.unsetenv("RSTUDIO") else Sys.setenv(RSTUDIO = old_env)})
+  on.exit(options(old_opt))
 
-  if(.Platform$OS.type == "windows"){
-    expect_equal(parallelType(), "socket")
-    options(VFmixing.parallel = "fork")
-    expect_equal(parallelType(), "socket")   # Windows can't fork
-  } else{
-    Sys.unsetenv("RSTUDIO")
-    expect_equal(parallelType(), "fork")
-    Sys.setenv(RSTUDIO = "1")
-    expect_equal(parallelType(), "socket")
-    options(VFmixing.parallel = "fork")
-    expect_equal(parallelType(), "fork")
-  }
+  expect_equal(parallelType(), "socket")
+  options(VFmixing.parallel = "fork")
+  expect_equal(parallelType(), if(.Platform$OS.type == "windows") "socket" else "fork")
 })
 
 test_that("parallel jobs report as they finish, and only when asked", {
@@ -326,4 +316,30 @@ test_that("the global objects worker_setup uses are copied to the workers too", 
   on.exit({options(old); rm(setup_base_value, envir = env)})
   res = runInParallel(1:2, function(i){get("setup_value", envir = globalenv()) + 1}, cores = 2, worker_setup = setup)
   expect_equal(unlist(res), rep(42, 2))
+})
+
+test_that("socket workers start single-threaded with this session's libraries, and the session is left as it was", {
+  skip_on_cran()
+  old = options(VFmixing.parallel = NULL)
+  on.exit(options(old))
+  before = Sys.getenv(c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "R_LIBS"), unset = NA)
+
+  res = runInParallel(1:2, function(i){c(Sys.getenv("OPENBLAS_NUM_THREADS"), Sys.getenv("OMP_NUM_THREADS"),
+                                         Sys.getenv("R_LIBS"))}, cores = 2)
+  for(r in res){
+    expect_equal(r[1:2], c("1", "1"))
+    expect_equal(r[3], paste(.libPaths(), collapse = .Platform$path.sep))
+  }
+  expect_equal(Sys.getenv(c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "R_LIBS"), unset = NA), before)
+})
+
+test_that("setting environment variables temporarily restores them", {
+  Sys.setenv(VFMIXING_TEST_A = "x")
+  Sys.unsetenv("VFMIXING_TEST_B")
+  restore = setEnvTemporarily(c(VFMIXING_TEST_A = "1", VFMIXING_TEST_B = "2"))
+  expect_equal(Sys.getenv(c("VFMIXING_TEST_A", "VFMIXING_TEST_B"), names = FALSE), c("1", "2"))
+  restore()
+  expect_equal(Sys.getenv("VFMIXING_TEST_A"), "x")
+  expect_true(is.na(Sys.getenv("VFMIXING_TEST_B", unset = NA)))
+  Sys.unsetenv("VFMIXING_TEST_A")
 })
