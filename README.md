@@ -48,7 +48,7 @@ baseVectorFields
 #>     f2 = c(curPos[1], curPos[2])/sqrt(sum(c(curPos[1], curPos[2])^2))
 #>     matrix(c(f1, f2), nrow = 2, byrow = F)
 #> }
-#> <bytecode: 0x0000023c8a16fcb8>
+#> <bytecode: 0x000001df54d47a88>
 #> <environment: namespace:VFmixing>
 ```
 
@@ -111,7 +111,7 @@ The run time, in seconds:
 ``` r
 PathTime
 #>    user  system elapsed 
-#>    0.23    0.05    0.28
+#>    0.26    0.04    0.31
 ```
 
 Because the “FullFours” path has a covariance structure, the plot can
@@ -213,7 +213,7 @@ The run time, in seconds:
 ``` r
 TrajTime
 #>    user  system elapsed 
-#>    5.36    0.07    5.46
+#>    0.84    0.00    0.86
 ```
 
 By default, every candidate up to `nsplits` is fit before the best one
@@ -234,7 +234,7 @@ PatienceTime <- system.time(
 ``` r
 PatienceTime
 #>    user  system elapsed 
-#>    0.01    0.00    0.03
+#>    0.03    0.00    0.03
 
 # Same trajectory as the full search?
 isTRUE(all.equal(EstTrajPatience$Traj, EstTraj$Traj))
@@ -303,10 +303,10 @@ $\hat\beta(t) \pm z\sqrt{s_w^2(t) + V_{\text{sel}}(t)}$, where
 $s_w^2(t)$ comes from One-Shot’s covariance. The residuals are scaled by
 $\sqrt{n/(n - p)}$ before resampling, so the replicates’ noise matches
 the path’s variance estimate. Because the conditional means have no
-noise in them, a small `B` (20 by default) is enough. The replicates
-are independent, so `cores = 4` (say) runs them in parallel, with the
-same result for any number of cores. On Windows the parallel workers use
-the installed package and are given the global objects the vector field
+noise in them, a small `B` (20 by default) is enough. The replicates are
+independent, so `cores = 4` (say) runs them in parallel, with the same
+result for any number of cores. On Windows the parallel workers use the
+installed package and are given the global objects the vector field
 function uses.
 
 ``` r
@@ -323,7 +323,7 @@ The run time, in seconds, with 20 bootstrap replicates:
 ``` r
 FullTime
 #>    user  system elapsed 
-#>    1.51    0.05    1.59
+#>    2.97    0.09    3.13
 ```
 
 The returned trajectory keeps One-Shot’s covariance as `Cov` and carries
@@ -335,18 +335,18 @@ present. The pointwise pieces on a time grid are in
 ``` r
 head(Fit$Variance$Pointwise)
 #>      t trajectory  var_within var_selection   var_total selection_share
-#> 1 0.00          1 0.009726079  1.256324e-05 0.009738642    0.0012900402
-#> 2 0.01          1 0.009121248  1.048787e-05 0.009131736    0.0011485082
-#> 3 0.02          1 0.008547730  8.668036e-06 0.008556398    0.0010130472
-#> 4 0.03          1 0.008004074  7.082385e-06 0.008011157    0.0008840653
-#> 5 0.04          1 0.007488898  5.710805e-06 0.007494609    0.0007619884
-#> 6 0.05          1 0.007000885  4.534353e-06 0.007005419    0.0006472637
+#> 1 0.00          1 0.009726079  1.281299e-05 0.009738892    0.0013156517
+#> 2 0.01          1 0.009121248  1.070437e-05 0.009131953    0.0011721887
+#> 3 0.02          1 0.008547730  8.854484e-06 0.008556585    0.0010348152
+#> 4 0.03          1 0.008004074  7.241778e-06 0.008011316    0.0009039436
+#> 5 0.04          1 0.007488898  5.845938e-06 0.007494744    0.0007800050
+#> 6 0.05          1 0.007000885  4.647831e-06 0.007005532    0.0006634516
 
 # Average share of the trajectory variance that comes from the node selection
 aggregate(selection_share ~ trajectory, data = Fit$Variance$Pointwise, FUN = mean)
 #>   trajectory selection_share
-#> 1          1      0.04850064
-#> 2          2      0.08263512
+#> 1          1      0.04842388
+#> 2          2      0.08282772
 ```
 
 Coverage of the true trajectories with One-Shot’s covariance alone, and
@@ -362,6 +362,22 @@ coverageRateTraj(Fit$EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
 #> [1] 1 1
 ```
 
+The estimates and their bands on a time grid, one data frame per
+trajectory (`labels` names them; `visualizeEstTraj()` takes the same
+`labels`):
+
+``` r
+Bands <- getTrajIntervals(Fit$EstTraj, t_grid_size = 0.1, labels = c("Field 1", "Field 2"))
+head(Bands[["Field 1"]])
+#>     t   estimate       lower      upper
+#> 1 0.0 0.05405961 -0.13936105 0.24748027
+#> 2 0.1 0.04065146 -0.09692964 0.17823256
+#> 3 0.2 0.03038060 -0.06190789 0.12266908
+#> 4 0.3 0.02276142 -0.03445314 0.07997597
+#> 5 0.4 0.01796689 -0.01975179 0.05568557
+#> 6 0.5 0.01488766 -0.02683829 0.05661361
+```
+
 ``` r
 visualizeEstTraj(EstTraj = Fit$EstTraj, TrueTraj = TrueTraj$Traj,
                  TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = Fit$EstPath,
@@ -369,7 +385,7 @@ visualizeEstTraj(EstTraj = Fit$EstTraj, TrueTraj = TrueTraj$Traj,
                  CL = 0.95, Cos_Cutoff = 0.91)
 ```
 
-<img src="man/figures/README-unnamed-chunk-19-1.png" width="100%" />
+<img src="man/figures/README-unnamed-chunk-20-1.png" width="100%" />
 
 The selection part still conditions on the base vector fields evaluated
 along the estimated path, so the error from the path position in those
@@ -384,17 +400,23 @@ run can be stopped and resumed, or split across machines by seed.
 
 | Study | Vector fields | Settings | Variants |
 |----|----|----|----|
-| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
-| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
-| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
+| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC, 2x BIC + bootstrap, and 2x BIC + bootstrap + refine 2 / refine 10 |
+| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + bootstrap + refine 2 |
+| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + bootstrap + refine 2 |
 | `runSimulationStudy_Collinearity2D()` | x-axis and a field at a random angle | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_ErrorProcess2D()` | rotation and expansion, noisy velocity at a random SNR | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Misspecification2D()` | data from rotation and expansion, fit with scaled versions | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Continuity2D()` | random gridded fields, nearest / bilinear / bicubic | low error, medium complexity, 3 continuities | 2x BIC + bootstrap |
 
-Every study allows up to 300 trajectory regions (`traj_nsplits`) and takes a
-`traj_refine` argument (1 by default) that splits each selected trajectory
-region before refitting.
+Positional error is set by a signal-to-noise ratio, scaled to how far each
+simulated drifter travels: each dimension's noise variance is that
+dimension's variance along the true path divided by `error_snr` (low 1e8,
+medium 1e4, high 1e2 by default). Each result records the noise standard
+deviation that gave (`error_sd`).
+
+Every study allows up to 300 trajectory regions (`traj_nsplits`) and
+takes a `traj_refine` argument (1 by default) that splits each selected
+trajectory region before refitting.
 
 The Axis study isolates the effect of each piece: the fields are
 constant, so any undercoverage comes from the bias and the node

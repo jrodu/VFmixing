@@ -1,6 +1,7 @@
 # A small, quick version of the study
-small_run = function(seed, progress = FALSE, variants = c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"), B = 3, ...){
-  runSimulationStudy_Axis2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+small_run = function(seed, progress = FALSE, variants = c("BIC", "2x BIC", "2x BIC + bootstrap", "2x BIC + bootstrap + refine 2",
+                                                              "2x BIC + bootstrap + refine 10"), B = 3, ...){
+  runSimulationStudy_Axis2D(seed = seed, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                             traj_nsplits = 20, variants = variants, B = B, progress = progress, ...)
 }
 
@@ -16,7 +17,7 @@ test_that("one replicate runs every variant and records every metric", {
 
   expect_named(run, c("Seed", "Settings", "VectorFields", "Results", "Data", "Fits"))
   r = run$Results
-  expect_equal(nrow(r), 4)
+  expect_equal(nrow(r), 5)
   expect_true(all(is.na(r$error)))
   expect_true(all(c("path_rmse", "traj_avg_sq_dist", "path_coverage_X1", "traj_coverage_Trajectory2",
                     "path_width_X2", "traj_width_Trajectory1", "variant", "time_total", "selection_share", "traj_coverage_within_Trajectory1") %in% names(r)))
@@ -28,8 +29,9 @@ test_that("one replicate runs every variant and records every metric", {
   # the bootstrap only adds variance to OneShot's
   expect_true(all(boot$traj_width_Trajectory1 >= boot$traj_width_within_Trajectory1 - 1e-12))
   expect_true(all(boot$selection_share >= 0 & boot$selection_share <= 1))
-  # the other variants have no selection part
-  expect_true(all(is.na(r$selection_share[r$variant != "2x BIC + bootstrap"])))
+  # the variants without a bootstrap have no selection part; those with one do
+  expect_true(all(is.na(r$selection_share[r$variant %in% c("BIC", "2x BIC")])))
+  expect_false(any(is.na(r$selection_share[grepl("bootstrap", r$variant)])))
 })
 
 test_that("a seed reproduces the data, independently of the variants", {
@@ -47,7 +49,7 @@ test_that("a seed reproduces the data, independently of the variants", {
 test_that("the study checks its arguments", {
   expect_error(small_run(1, variants = "Spline"), "variants")
   expect_error(small_run(1, B = 1), "B must")
-  expect_error(runSimulationStudy_Axis2D(1, error_sd = c(0.01)), "named")
+  expect_error(runSimulationStudy_Axis2D(1, error_snr = c(1e4)), "named")
   expect_error(runSimulationStudy_Axis2D(1, patience = 0), "patience")
 })
 
@@ -66,22 +68,25 @@ test_that("the variants differ only where they should", {
   r = run$Results
   rows = function(v) r[r$variant == v, ]
 
-  expect_equal(r$variant, c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap"))
+  expect_equal(r$variant, c("BIC", "2x BIC", "2x BIC + bootstrap", "2x BIC + bootstrap + refine 2", "2x BIC + bootstrap + refine 10"))
   # the path is doubled for every variant but BIC
   expect_gte(rows("2x BIC")$path_regions, 2*rows("BIC")$path_regions)
-  expect_equal(rows("2x BIC path only")$path_regions, rows("2x BIC")$path_regions)
   # the bootstrap leaves the estimates alone and only adds variance
   expect_equal(rows("2x BIC + bootstrap")$traj_regions, rows("2x BIC")$traj_regions)
   expect_equal(rows("2x BIC + bootstrap")$traj_avg_sq_dist, rows("2x BIC")$traj_avg_sq_dist)
   expect_equal(rows("2x BIC + bootstrap")$traj_width_within_Trajectory1, rows("2x BIC")$traj_width_Trajectory1)
+  # the refined variants split every selected trajectory region into 2 or 10, on the same path
+  expect_equal(rows("2x BIC + bootstrap + refine 2")$traj_regions, 2*rows("2x BIC + bootstrap")$traj_regions)
+  expect_equal(rows("2x BIC + bootstrap + refine 10")$traj_regions, 10*rows("2x BIC + bootstrap")$traj_regions)
+  expect_equal(rows("2x BIC + bootstrap + refine 10")$path_regions, rows("2x BIC + bootstrap")$path_regions)
 })
 
 test_that("the refined bootstrap variant splits every trajectory region in two", {
-  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"), keep_fits = FALSE)
+  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + bootstrap + refine 2"), keep_fits = FALSE)
   r = run$Results
   expect_true(all(is.na(r$error)))
   plain = r[r$variant == "2x BIC + bootstrap", ]
-  refined = r[r$variant == "2x BIC + refine + bootstrap", ]
+  refined = r[r$variant == "2x BIC + bootstrap + refine 2", ]
   expect_equal(refined$traj_regions, 2*plain$traj_regions)
   expect_false(is.na(refined$selection_share))
   expect_true(refined$traj_width_Trajectory1 >= refined$traj_width_within_Trajectory1 - 1e-12)

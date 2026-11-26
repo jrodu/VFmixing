@@ -6,7 +6,7 @@
 \usage{
 runSimulationStudy_ErrorProcess2D(
   seed,
-  error_sd = c(low = 0.001),
+  error_snr = c(low = 1e+08),
   n_regions = c(med = 10),
   log10_snr_range = c(-1, 1),
   variants = "2x BIC + bootstrap",
@@ -30,7 +30,8 @@ runSimulationStudy_ErrorProcess2D(
 \arguments{
 \item{seed}{an integer. The random seed for this replicate.}
 
-\item{error_sd}{a named numeric vector. The positional error standard deviations, named by level.}
+\item{error_snr}{a named numeric vector. The positional signal-to-noise ratios, named by level: each
+dimension's noise variance is that dimension's variance along the true path divided by the ratio. See Details.}
 
 \item{n_regions}{a named numeric vector. The number of regions in the true trajectories, named by complexity level.}
 
@@ -114,9 +115,9 @@ step is the 4th-order Runge-Kutta step of \code{\link[=RungeKutta]{RungeKutta()}
 fresh for each step, normal with standard deviation
 \eqn{\|v\| / (\mathrm{SNR}\sqrt{2})} in each dimension (so its root mean
 square size is \eqn{\|v\| / \mathrm{SNR}}), with \eqn{\|v\|} the speed at
-the start of the step. The observed data
-add independent normal positional error with the error level's standard
-deviation to each position. All data sets are simulated (in a fixed order)
+the start of the step. The observed data add independent normal noise
+to each position, with each dimension's variance its variance along the
+true path divided by the error level's signal-to-noise ratio (\code{error_snr}). All data sets are simulated (in a fixed order)
 before any fitting.
 
 \strong{Variants.} Every variant fits a FullFours path and OneShot trajectories
@@ -135,6 +136,8 @@ total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajecto
 
 \strong{Metrics.} For each setting and variant:
 \itemize{
+\item \code{error_sd}: the noise standard deviation the data set got, averaged over
+the dimensions.
 \item \code{snr}: the replicate's velocity signal-to-noise ratio.
 \item \code{path_rmse}: root mean squared distance between the estimated and true
 (noisy) positions at the data times.
@@ -158,7 +161,7 @@ If a fit fails, its metrics are \code{NA} and the error message is recorded.
 \examples{
 \donttest{
 # One replicate with a single, quick setting
-run = runSimulationStudy_ErrorProcess2D(seed = 1, error_sd = c(med = 0.01),
+run = runSimulationStudy_ErrorProcess2D(seed = 1, error_snr = c(med = 1e4),
                                         n_regions = c(low = 2), t_end = 5, variants = "2x BIC")
 run$Results
 

@@ -38,7 +38,8 @@
 #' only defined on the grid, so if the path leaves \eqn{[-10, 10]^2}, the
 #' trajectories and start are drawn again (up to `max_attempts` times); the
 #' number of draws is recorded. The observed data add independent normal noise
-#' with the error level's standard deviation to each position. All data sets
+#' to each position, with each dimension's variance its variance along the
+#' true path divided by the error level's signal-to-noise ratio (`error_snr`). All data sets
 #' are simulated (in a fixed order) before any fitting.
 #'
 #' **Variants.** Every variant fits a FullFours path and OneShot trajectories
@@ -56,6 +57,8 @@
 #' Each setting is fitted with its own continuity's fields.
 #'
 #' **Metrics.** For each setting and variant:
+#' * `error_sd`: the noise standard deviation the data set got, averaged over
+#'   the dimensions.
 #' * `path_attempts`: the number of draws needed for a path inside the grid.
 #' * `path_rmse`: root mean squared distance between the estimated and true
 #'   positions at the data times.
@@ -76,7 +79,8 @@
 #' If a fit fails, its metrics are `NA` and the error message is recorded.
 #'
 #' @param seed an integer. The random seed for this replicate.
-#' @param error_sd a named numeric vector. The positional error standard deviations, named by level.
+#' @param error_snr a named numeric vector. The positional signal-to-noise ratios, named by level: each
+#' dimension's noise variance is that dimension's variance along the true path divided by the ratio. See Details.
 #' @param n_regions a named numeric vector. The number of regions in the true trajectories, named by complexity level.
 #' @param continuity a character vector, any of `"discontinuous"`, `"continuous"` and `"differentiable"`.
 #' @param variants a character vector of variants. See Details.
@@ -114,7 +118,7 @@
 #' \donttest{
 #' if(requireNamespace("akima", quietly = TRUE)){
 #'   # One replicate with a single, quick setting
-#'   run = runSimulationStudy_Continuity2D(seed = 1, error_sd = c(med = 0.01),
+#'   run = runSimulationStudy_Continuity2D(seed = 1, error_snr = c(med = 1e4),
 #'                                         n_regions = c(low = 2),
 #'                                         continuity = "continuous", t_end = 5, variants = "2x BIC")
 #'   run$Results
@@ -128,7 +132,7 @@
 #' }
 #'
 runSimulationStudy_Continuity2D = function(seed,
-                                           error_sd = c(low = 0.001),
+                                           error_snr = c(low = 1e8),
                                            n_regions = c(med = 10),
                                            continuity = c("discontinuous", "continuous", "differentiable"),
                                            variants = "2x BIC + bootstrap", B = 20, traj_refine = 1, cores = 1,
@@ -147,8 +151,8 @@ runSimulationStudy_Continuity2D = function(seed,
     stop("This study needs the akima package. Install it with install.packages(\"akima\").", call. = FALSE)
   }
 
-  if(is.null(names(error_sd)) || any(names(error_sd) == "") || any(error_sd < 0)){
-    stop("error_sd must be a named vector of non-negative standard deviations.", call. = FALSE)
+  if(is.null(names(error_snr)) || any(names(error_snr) == "") || any(!is.finite(error_snr)) || any(error_snr <= 0)){
+    stop("error_snr must be a named vector of positive signal-to-noise ratios.", call. = FALSE)
   }
 
   if(is.null(names(n_regions)) || any(names(n_regions) == "") || any(n_regions < 1) || any(n_regions != round(n_regions))){
@@ -308,16 +312,16 @@ runSimulationStudy_Continuity2D = function(seed,
 
   # ---- Settings --------------------------------------------------------------
 
-  settings = expand.grid(error_level = names(error_sd), complexity = names(n_regions), continuity = continuity,
+  settings = expand.grid(error_level = names(error_snr), complexity = names(n_regions), continuity = continuity,
                          stringsAsFactors = FALSE)
-  settings$error_sd = unname(error_sd[settings$error_level])
+  settings$error_snr = unname(error_snr[settings$error_level])
   settings$n_true_regions = unname(n_regions[settings$complexity])
   settings$name = stringr::str_c("error_", settings$error_level, ".complexity_", settings$complexity,
                                  ".continuity_", settings$continuity)
 
   # ---- Simulate one data set -------------------------------------------------
 
-  simulateData = function(n_true_regions, sd, vectorFields){
+  simulateData = function(n_true_regions, error_snr, vectorFields){
 
     traj_splits = seq(0, t_end, length.out = n_true_regions + 1)
 
@@ -341,7 +345,7 @@ runSimulationStudy_Continuity2D = function(seed,
 
     sim_data = true_data
     for(d in seq_len(n_dim)){
-      sim_data[, d + 1] = sim_data[, d + 1] + stats::rnorm(nrow(sim_data), mean = 0, sd = sd)
+      sim_data[, d + 1] = sim_data[, d + 1] + stats::rnorm(nrow(sim_data), mean = 0, sd = sqrt(stats::var(true_data[, d + 1])/error_snr))
     }
 
     list(TrueTraj = list(Traj = true_traj, TimeSplits = traj_splits), TrueData = true_data, SimData = sim_data,
@@ -471,6 +475,11 @@ runSimulationStudy_Continuity2D = function(seed,
     list(metrics = metrics, EstPath = EstPath, EstTraj = EstTraj, Variance = Variance)
 
   }
+  # The noise standard deviation a data set got, averaged over the dimensions
+  noiseSD = function(true_data, error_snr){
+    mean(sqrt(apply(as.matrix(true_data[, -1]), 2, stats::var)/error_snr))
+  }
+
 
   # ---- Run the replicate -----------------------------------------------------
 
@@ -491,7 +500,7 @@ runSimulationStudy_Continuity2D = function(seed,
 
   sim_data = lapply(seq_len(nrow(settings)), function(i){
     say("simulating data set ", i, "/", nrow(settings), ": ", settings$name[i])
-    simulateData(n_true_regions = settings$n_true_regions[i], sd = settings$error_sd[i],
+    simulateData(n_true_regions = settings$n_true_regions[i], error_snr = settings$error_snr[i],
                  vectorFields = vector_fields[[settings$continuity[i]]])
   })
   names(sim_data) = settings$name
@@ -510,7 +519,7 @@ runSimulationStudy_Continuity2D = function(seed,
           sprintf(" (%.1f s)", fit$metrics$time_total),
           if(!is.na(fit$metrics$error)) stringr::str_c(" FAILED: ", fit$metrics$error))
 
-      results[[length(results) + 1]] = data.frame(seed = seed, settings[i, c("error_level", "error_sd", "complexity", "n_true_regions", "continuity")],
+      results[[length(results) + 1]] = data.frame(seed = seed, error_sd = noiseSD(sim_data[[i]]$TrueData, settings$error_snr[i]), settings[i, c("error_level", "error_snr", "complexity", "n_true_regions", "continuity")],
                                                   fit$metrics, row.names = NULL, check.names = FALSE)
 
       if(keep_fits){
@@ -525,7 +534,7 @@ runSimulationStudy_Continuity2D = function(seed,
   say("done in ", sprintf("%.1f", as.numeric(difftime(Sys.time(), run_start, units = "mins"))), " min")
 
   out = list(Seed = seed,
-             Settings = list(study = "Continuity2D", error_sd = error_sd, n_regions = n_regions, continuity = continuity,
+             Settings = list(study = "Continuity2D", error_snr = error_snr, n_regions = n_regions, continuity = continuity,
                              variants = variants, B = B, traj_refine = traj_refine, cores = cores, patience = patience, t_end = t_end, t_step = t_step,
                              path_nsplits = path_nsplits, traj_nsplits = traj_nsplits, CL = CL,
                              sigma = sigma, k = k, start_range = start_range, max_attempts = max_attempts),

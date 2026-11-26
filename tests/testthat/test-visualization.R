@@ -48,3 +48,36 @@ test_that("visualizeEstPath plots paths without a covariance and checks its inpu
   expect_error(visualizeEstPath(ExData, ExEstPath_FullFours, x_var = "X1", y_var = "X1"), "two different")
   expect_error(visualizeEstPath(ExData, ExEstPath_FullFours, CL = 1.5), "CL")
 })
+
+test_that("getTrajIntervals gives the gridded estimates and the intervals the other functions use", {
+  out = getTrajIntervals(ExEstTraj_OneShot, t_grid_size = 0.01, labels = c("A", "B"))
+  expect_named(out, c("A", "B"))
+  expect_named(out$A, c("t", "estimate", "lower", "upper"))
+  expect_true(all(out$A$lower <= out$A$estimate & out$A$estimate <= out$A$upper))
+
+  # The same widths as avgCIWidthTraj(), and the same coverage as coverageRateTraj()
+  expect_equal(unname(c(mean(out$A$upper - out$A$lower), mean(out$B$upper - out$B$lower))),
+               unname(avgCIWidthTraj(ExEstTraj_OneShot, t_grid_size = 0.01)), tolerance = 1e-8)
+  truth = VFmixing:::evaluateTrajAt(out$A$t, ExTraj)
+  inside = c(mean(truth[, 1] > out$A$lower & truth[, 1] < out$A$upper), mean(truth[, 2] > out$B$lower & truth[, 2] < out$B$upper))
+  expect_equal(inside, unname(coverageRateTraj(ExEstTraj_OneShot, ExTraj$Traj, ExTraj$TimeSplits)), tolerance = 1e-8)
+
+  # Default names, NA bounds without a covariance, and label checks
+  expect_named(getTrajIntervals(ExEstTraj_OneShot, t_grid_size = 0.5), c("Trajectory1", "Trajectory2"))
+  no_cov = getTrajIntervals(ExEstTraj_ByFours, t_grid_size = 0.5)
+  expect_true(all(is.na(no_cov[[1]]$lower)))
+  expect_error(getTrajIntervals(ExEstTraj_OneShot, labels = "only one"), "labels")
+})
+
+test_that("visualizeEstTraj works without the path and fields, and uses the labels", {
+  p = visualizeEstTraj(ExEstTraj_OneShot, t_grid_size = 0.05, labels = c("Geostrophic", "Ekman"))
+  expect_s3_class(p, "ggplot")
+  expect_equal(levels(p$layers[[1]]$data$Model), c("Geostrophic", "Ekman"))
+  # no collinearity shading without the path and fields: path, ribbon
+  expect_length(p$layers, 2)
+
+  # with the path, fields and truth: path, shading, ribbon, truth
+  full = visualizeEstTraj(ExEstTraj_OneShot, ExTraj$Traj, ExTraj$TimeSplits, ExEstPath_FullFours, baseVectorFields, t_grid_size = 0.05)
+  expect_length(full$layers, 4)
+  expect_error(visualizeEstTraj(ExEstTraj_OneShot, TrueTraj = ExTraj$Traj), "TrueTrajTimeSplits")
+})

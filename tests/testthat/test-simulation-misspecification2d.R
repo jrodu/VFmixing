@@ -1,6 +1,6 @@
 # A small, quick version of the study
 small_run = function(seed, progress = FALSE, variants = "2x BIC + bootstrap", B = 3, ...){
-  runSimulationStudy_Misspecification2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  runSimulationStudy_Misspecification2D(seed = seed, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                                         traj_nsplits = 20, variants = variants, B = B, progress = progress, ...)
 }
 
@@ -53,7 +53,7 @@ test_that("a seed reproduces the data, independently of the variants", {
 test_that("the study checks its arguments", {
   expect_error(small_run(1, variants = "Spline"), "variants")
   expect_error(small_run(1, B = 1), "B must")
-  expect_error(runSimulationStudy_Misspecification2D(1, error_sd = c(0.01)), "named")
+  expect_error(runSimulationStudy_Misspecification2D(1, error_snr = c(1e4)), "named")
   expect_error(runSimulationStudy_Misspecification2D(1, patience = 0), "patience")
 })
 

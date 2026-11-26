@@ -1,6 +1,6 @@
 # A small, quick version of the study
 small_run = function(seed, progress = FALSE, variants = "2x BIC + bootstrap", B = 3, ...){
-  runSimulationStudy_Lorenz3D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  runSimulationStudy_Lorenz3D(seed = seed, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                             traj_nsplits = 20, variants = variants, B = B, progress = progress, ...)
 }
 
@@ -54,7 +54,7 @@ test_that("a seed reproduces the data, independently of the variants", {
 test_that("the study checks its arguments", {
   expect_error(small_run(1, variants = "Spline"), "variants")
   expect_error(small_run(1, B = 1), "B must")
-  expect_error(runSimulationStudy_Lorenz3D(1, error_sd = c(0.01)), "named")
+  expect_error(runSimulationStudy_Lorenz3D(1, error_snr = c(1e4)), "named")
   expect_error(runSimulationStudy_Lorenz3D(1, patience = 0), "patience")
 })
 
@@ -69,16 +69,16 @@ test_that("progress is printed as the replicate runs", {
 })
 
 test_that("the refined bootstrap variant reuses the bootstrap and splits every trajectory region", {
-  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + refine + bootstrap"))
+  run = small_run(7, variants = c("2x BIC + bootstrap", "2x BIC + bootstrap + refine 2"))
   r = run$Results
   expect_true(all(is.na(r$error)))
   plain = r[r$variant == "2x BIC + bootstrap", ]
-  refined = r[r$variant == "2x BIC + refine + bootstrap", ]
+  refined = r[r$variant == "2x BIC + bootstrap + refine 2", ]
   expect_equal(refined$traj_regions, 2*plain$traj_regions)
   expect_equal(refined$path_regions, plain$path_regions)
   expect_false(is.na(refined$selection_share))
   # the same path fit: the refined variant reused the bootstrap fit
   fits = run$Fits[[1]]
-  expect_identical(fits[["2x BIC + refine + bootstrap"]]$EstPath, fits[["2x BIC + bootstrap"]]$EstPath)
-  expect_length(fits[["2x BIC + refine + bootstrap"]]$EstTraj$SelectionMeans, 3)
+  expect_identical(fits[["2x BIC + bootstrap + refine 2"]]$EstPath, fits[["2x BIC + bootstrap"]]$EstPath)
+  expect_length(fits[["2x BIC + bootstrap + refine 2"]]$EstTraj$SelectionMeans, 3)
 })

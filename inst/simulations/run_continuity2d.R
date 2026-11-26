@@ -44,7 +44,7 @@ results = do.call(rbind, lapply(files, function(f){readRDS(f)$Results}))
 saveRDS(results, file.path(out_dir, "continuity2d_results_all.rds"))
 
 # Example summary: mean of each metric by error level, complexity, continuity and variant
-metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_sd", "n_true_regions"))
+metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_snr", "n_true_regions"))
 summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity", "continuity", "variant")], FUN = mean, na.rm = TRUE)
 print(summary_table)
 

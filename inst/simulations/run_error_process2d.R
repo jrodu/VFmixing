@@ -44,7 +44,7 @@ saveRDS(results, file.path(out_dir, "error_process2d_results_all.rds"))
 
 # Example summary: mean of each metric by error level, complexity and variant (to study
 # the SNR, model the metrics in results against log10(results$snr) instead)
-metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_sd", "n_true_regions", "snr"))
+metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_snr", "n_true_regions", "snr"))
 summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity", "variant")], FUN = mean, na.rm = TRUE)
 print(summary_table)
 

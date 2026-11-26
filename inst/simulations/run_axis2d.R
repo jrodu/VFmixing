@@ -7,10 +7,10 @@
 # Find this script with:
 #   system.file("simulations", "run_axis2d.R", package = "VFmixing")
 #
-# Each seed covers 3 error levels x 3 trajectory complexities x 5 variants:
-# BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, and 2x BIC + bootstrap
-# with every trajectory region split in two (B = 20). The split variant reuses
-# the bootstrap, so it adds only a few seconds.
+# Each seed covers 3 error levels (SNR 1e8, 1e4, 1e2) x 3 trajectory complexities
+# x 5 variants: BIC, 2x BIC, 2x BIC + bootstrap (B = 20), and 2x BIC + bootstrap
+# with every trajectory region split into 2 or into 10. The split variants reuse
+# the bootstrap, so they add only refits.
 # These times were measured with traj_nsplits = 100. The default is now 300,
 # which makes the low error, high complexity setting slower.
 # Each seed takes roughly 20 minutes on one core, most of it in the low error,
@@ -48,7 +48,7 @@ results = do.call(rbind, lapply(files, function(f){readRDS(f)$Results}))
 saveRDS(results, file.path(out_dir, "axis2d_results_all.rds"))
 
 # Example summary: mean of each metric by error level, complexity and variant
-metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_sd", "n_true_regions"))
+metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_snr", "n_true_regions"))
 summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity", "variant")], FUN = mean, na.rm = TRUE)
 print(summary_table)
 
