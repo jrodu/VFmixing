@@ -6,10 +6,10 @@
 \usage{
 runSimulationStudy_Axis2D(
   seed,
-  error_sd = c(low = 0.001, med = 0.01, high = 0.1),
+  error_snr = c(low = 1e+08, med = 10000, high = 100),
   n_regions = c(low = 2, med = 10, high = 50),
-  variants = c("BIC", "2x BIC path only", "2x BIC", "2x BIC + bootstrap",
-    "2x BIC + refine + bootstrap"),
+  variants = c("BIC", "2x BIC", "2x BIC + bootstrap", "2x BIC + bootstrap + refine 2",
+    "2x BIC + bootstrap + refine 10"),
   B = 20,
   traj_refine = 1,
   cores = 1,
@@ -30,7 +30,8 @@ runSimulationStudy_Axis2D(
 \arguments{
 \item{seed}{an integer. The random seed for this replicate.}
 
-\item{error_sd}{a named numeric vector. The positional error standard deviations, named by level.}
+\item{error_snr}{a named numeric vector. The positional signal-to-noise ratios, named by level: each
+dimension's noise variance is that dimension's variance along the true path divided by the ratio. See Details.}
 
 \item{n_regions}{a named numeric vector. The number of regions in the true trajectories, named by complexity level.}
 
@@ -97,8 +98,9 @@ spaced regions on \eqn{[0, t_{end}]} are drawn with
 \code{\link[=generateFullTrajectory]{generateFullTrajectory()}} (\code{sigma}, \code{k}). The true path is the
 \code{\link[=RungeKutta]{RungeKutta()}} solution through the trajectory-weighted fields from a start
 position drawn uniformly on \code{start_range} in each dimension, with time step
-\code{t_step}. The observed data add independent normal noise with the error
-level's standard deviation to each position. All data sets are simulated
+\code{t_step}. The observed data add independent normal noise
+to each position, with each dimension's variance its variance along the
+true path divided by the error level's signal-to-noise ratio (\code{error_snr}). All data sets are simulated
 (in a fixed order) before any fitting, so the data for a seed do not depend
 on which variants are run.
 
@@ -109,22 +111,23 @@ none are split). Each entry of \code{variants}
 is one of:
 \itemize{
 \item \code{"BIC"}: the regions BIC selects, for both the path and the trajectories.
-\item \code{"2x BIC path only"}: twice BIC's path regions, BIC's trajectory regions.
 \item \code{"2x BIC"}: twice BIC's regions for both (the default undersmoothing).
 \item \code{"2x BIC + bootstrap"}: \code{"2x BIC"}, with the node-selection variance from
 \code{B} bootstrap replicates added to OneShot's variance at each time, through
 the law of total variance (\code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}}).
-\item \code{"2x BIC + refine + bootstrap"}: \code{"2x BIC + bootstrap"}, with every selected
-trajectory region split in two (twice \code{traj_refine}), in the bootstrap
-replicates too. This shows what the extra trajectory regions buy where the
-remaining bias comes from trajectory nodes that miss the true ones. It
-reuses the bootstrap of \code{"2x BIC + bootstrap"} (the same node selections,
-refit on the split regions with \code{\link[=refineEstimatedTrajectories_Full]{refineEstimatedTrajectories_Full()}}), so
-it adds little time.
+\item \code{"2x BIC + bootstrap + refine 2"}, \code{"2x BIC + bootstrap + refine 10"}:
+\code{"2x BIC + bootstrap"}, with every selected trajectory region split into 2
+or 10 (times \code{traj_refine}), in the bootstrap replicates too. These show
+what extra trajectory regions buy where the remaining bias comes from
+trajectory nodes that miss the true ones. They reuse the bootstrap of
+\code{"2x BIC + bootstrap"} (the same node selections, refit on the split
+regions with \code{\link[=refineEstimatedTrajectories_Full]{refineEstimatedTrajectories_Full()}}), so they add little time.
 }
 
 \strong{Metrics.} For each setting and variant:
 \itemize{
+\item \code{error_sd}: the noise standard deviation the data set got, averaged over
+the dimensions.
 \item \code{path_rmse}: root mean squared distance between the estimated and true
 positions at the data times.
 \item \code{traj_avg_sq_dist}: \code{\link[=cubicAvgSquareDist]{cubicAvgSquareDist()}} between the estimated and true
@@ -149,7 +152,7 @@ If a fit fails, its metrics are \code{NA} and the error message is recorded.
 \examples{
 \donttest{
 # One replicate with a single, quick setting
-run = runSimulationStudy_Axis2D(seed = 1, error_sd = c(med = 0.01),
+run = runSimulationStudy_Axis2D(seed = 1, error_snr = c(med = 1e4),
                                 n_regions = c(low = 2), t_end = 5, variants = "2x BIC")
 run$Results
 

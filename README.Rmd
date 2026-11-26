@@ -321,6 +321,14 @@ coverageRateTraj(OneShotOnly, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
 coverageRateTraj(Fit$EstTraj, TrueTraj$Traj, TrueTraj$TimeSplits, CL = 0.95)
 ```
 
+The estimates and their bands on a time grid, one data frame per trajectory
+(`labels` names them; `visualizeEstTraj()` takes the same `labels`):
+
+```{r}
+Bands <- getTrajIntervals(Fit$EstTraj, t_grid_size = 0.1, labels = c("Field 1", "Field 2"))
+head(Bands[["Field 1"]])
+```
+
 ```{r}
 visualizeEstTraj(EstTraj = Fit$EstTraj, TrueTraj = TrueTraj$Traj,
                  TrueTrajTimeSplits = TrueTraj$TimeSplits, EstPath = Fit$EstPath,
@@ -341,13 +349,19 @@ be stopped and resumed, or split across machines by seed.
 
 | Study | Vector fields | Settings | Variants |
 |---|---|---|---|
-| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC on the path only, 2x BIC, 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
-| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
-| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + refine + bootstrap |
+| `runSimulationStudy_Axis2D()` | constant (0, 1) and (1, 0) | 3 error levels x 3 complexities | BIC, 2x BIC, 2x BIC + bootstrap, and 2x BIC + bootstrap + refine 2 / refine 10 |
+| `runSimulationStudy_RotationExpansion2D()` | unit rotation and expansion | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + bootstrap + refine 2 |
+| `runSimulationStudy_Lorenz3D()` | Lorenz field and two orthogonal companions | 3 error levels x 3 complexities | 2x BIC + bootstrap, 2x BIC + bootstrap + refine 2 |
 | `runSimulationStudy_Collinearity2D()` | x-axis and a field at a random angle | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_ErrorProcess2D()` | rotation and expansion, noisy velocity at a random SNR | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Misspecification2D()` | data from rotation and expansion, fit with scaled versions | low error, medium complexity | 2x BIC + bootstrap |
 | `runSimulationStudy_Continuity2D()` | random gridded fields, nearest / bilinear / bicubic | low error, medium complexity, 3 continuities | 2x BIC + bootstrap |
+
+Positional error is set by a signal-to-noise ratio, scaled to how far each
+simulated drifter travels: each dimension's noise variance is that
+dimension's variance along the true path divided by `error_snr` (low 1e8,
+medium 1e4, high 1e2 by default). Each result records the noise standard
+deviation that gave (`error_sd`).
 
 Every study allows up to 300 trajectory regions (`traj_nsplits`) and takes a
 `traj_refine` argument (1 by default) that splits each selected trajectory

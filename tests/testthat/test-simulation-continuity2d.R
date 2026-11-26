@@ -2,7 +2,7 @@ skip_if_not_installed("akima")
 
 # A small, quick version of the study
 small_run = function(seed, progress = FALSE, continuity = c("discontinuous", "continuous", "differentiable"), B = 3, ...){
-  runSimulationStudy_Continuity2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  runSimulationStudy_Continuity2D(seed = seed, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                                   traj_nsplits = 20, continuity = continuity, B = B, progress = progress, ...)
 }
 
@@ -73,7 +73,7 @@ test_that("a seed reproduces the replicate", {
 })
 
 test_that("the study checks its arguments", {
-  expect_error(runSimulationStudy_Continuity2D(1, error_sd = c(0.01)), "named")
+  expect_error(runSimulationStudy_Continuity2D(1, error_snr = c(1e4)), "named")
   expect_error(runSimulationStudy_Continuity2D(1, continuity = "smooth"), "continuity")
   expect_error(runSimulationStudy_Continuity2D(1, start_range = c(-20, 20)), "start_range")
   expect_error(runSimulationStudy_Continuity2D(1, patience = 0), "patience")

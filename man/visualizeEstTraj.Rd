@@ -6,13 +6,14 @@
 \usage{
 visualizeEstTraj(
   EstTraj,
-  TrueTraj,
-  TrueTrajTimeSplits,
-  EstPath,
-  baseVectorFields,
+  TrueTraj = NULL,
+  TrueTrajTimeSplits = NULL,
+  EstPath = NULL,
+  baseVectorFields = NULL,
   t_grid_size = 0.01,
   CL = 0.95,
-  Cos_Cutoff = 0.91
+  Cos_Cutoff = 0.91,
+  labels = NULL
 )
 }
 \arguments{
@@ -20,31 +21,43 @@ visualizeEstTraj(
 
 \item{TrueTraj}{a list of numeric matrices. The list of coefficient matrices of a true trajectory. Not required.}
 
-\item{TrueTrajTimeSplits}{a numeric vector. The nodes of the true trajectory in addition with the starting and ending time. Not required.}
+\item{TrueTrajTimeSplits}{a numeric vector. The nodes of the true trajectory in addition with the starting and ending
+time. Needed with TrueTraj.}
 
-\item{EstPath}{an EstimatedPath object. The path used to estimate the trajectories.}
+\item{EstPath}{an EstimatedPath object, the path used to estimate the trajectories. Not required: with
+\code{baseVectorFields}, it is used to shade the times where the fields along the path are close to collinear.}
 
-\item{baseVectorFields}{a baseVectorFieldFunction.}
+\item{baseVectorFields}{a baseVectorFieldFunction. Not required: see \code{EstPath}.}
 
 \item{t_grid_size}{a positive numeric scalar. The time grid size of the plotting.}
 
-\item{CL}{a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj was estimated using the OneShot method.
-The bands are confidence intervals from the trajectory coefficient covariance. There is no prediction interval:
-the trajectories are never observed directly, and the OneShot \eqn{\sigma^2} describes the velocity residuals.}
+\item{CL}{a real number between 0 and 1. The confidence level of the intervals to plot. Only used if EstTraj has a
+covariance structure (OneShot). The bands are confidence intervals from the trajectory coefficient covariance,
+plus the node-selection variance if EstTraj comes from \code{\link[=getEstimatedTrajectories_Full]{getEstimatedTrajectories_Full()}} with the bootstrap. There
+is no prediction interval: the trajectories are never observed directly.}
 
-\item{Cos_Cutoff}{a real number between 0 and 1. The cosine value to determine the cutoff for when vector fields are too colinear.}
+\item{Cos_Cutoff}{a real number between 0 and 1. The cosine value to determine the cutoff for when vector fields
+are too colinear. Only used with \code{EstPath} and \code{baseVectorFields}.}
+
+\item{labels}{NULL or a character vector with one name per trajectory, shown in the legend. NULL gives
+"Trajectory1", "Trajectory2", ...}
 }
 \value{
 a ggplot2 object.
 }
 \description{
-visualizeEstTraj
+Plots the estimated trajectories with their pointwise confidence bands (from
+\code{\link[=getTrajIntervals]{getTrajIntervals()}}), optionally with the true trajectories and with the
+times shaded where the base vector fields are close to collinear.
 }
 \examples{
-# visualizeEstTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj, 
-#                  TrueTrajTimeSplits = ExTraj$TimeSplits, 
-#                  EstPath = ExEstPath_FullFours, 
-#                  baseVectorFields = baseVectorFields, t_grid_size = 0.01, 
+visualizeEstTraj(EstTraj = ExEstTraj_OneShot, t_grid_size = 0.05, labels = c("Field A", "Field B"))
+
+# With the truth and the collinearity shading
+# visualizeEstTraj(EstTraj = ExEstTraj_OneShot, TrueTraj = ExTraj$Traj,
+#                  TrueTrajTimeSplits = ExTraj$TimeSplits,
+#                  EstPath = ExEstPath_FullFours,
+#                  baseVectorFields = baseVectorFields, t_grid_size = 0.01,
 #                  Cos_Cutoff = 0.91)
-  
+
 }

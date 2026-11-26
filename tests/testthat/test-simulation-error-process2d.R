@@ -1,6 +1,6 @@
 # A small, quick version of the study
 small_run = function(seed, progress = FALSE, B = 3, ...){
-  runSimulationStudy_ErrorProcess2D(seed = seed, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  runSimulationStudy_ErrorProcess2D(seed = seed, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                                     traj_nsplits = 20, B = B, progress = progress, ...)
 }
 
@@ -17,7 +17,7 @@ test_that("the study draws one SNR and returns its vector fields", {
 })
 
 test_that("every setting in a replicate shares the SNR", {
-  run = runSimulationStudy_ErrorProcess2D(seed = 2, error_sd = c(low = 0.001, high = 0.1), n_regions = c(low = 2),
+  run = runSimulationStudy_ErrorProcess2D(seed = 2, error_snr = c(low = 1e8, high = 1e2), n_regions = c(low = 2),
                                           t_end = 4, traj_nsplits = 20, variants = "2x BIC", keep_fits = FALSE)
   expect_equal(nrow(run$Results), 2)
   expect_equal(run$Results$snr, rep(run$SNR, 2))
@@ -25,9 +25,9 @@ test_that("every setting in a replicate shares the SNR", {
 
 test_that("the true path is a noisy solution whose noise shrinks with the SNR", {
   # A fixed SNR through a one-point range
-  lo = runSimulationStudy_ErrorProcess2D(seed = 3, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  lo = runSimulationStudy_ErrorProcess2D(seed = 3, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                                          traj_nsplits = 20, log10_snr_range = c(-1, -1), keep_fits = FALSE)
-  hi = runSimulationStudy_ErrorProcess2D(seed = 3, error_sd = c(med = 0.01), n_regions = c(low = 2), t_end = 4,
+  hi = runSimulationStudy_ErrorProcess2D(seed = 3, error_snr = c(med = 1e4), n_regions = c(low = 2), t_end = 4,
                                          traj_nsplits = 20, log10_snr_range = c(3, 3), keep_fits = FALSE)
   expect_equal(lo$SNR, 0.1)
   expect_equal(hi$SNR, 1000)
@@ -69,7 +69,7 @@ test_that("a seed reproduces the replicate", {
 })
 
 test_that("the study checks its arguments", {
-  expect_error(runSimulationStudy_ErrorProcess2D(1, error_sd = c(0.01)), "named")
+  expect_error(runSimulationStudy_ErrorProcess2D(1, error_snr = c(1e4)), "named")
   expect_error(runSimulationStudy_ErrorProcess2D(1, log10_snr_range = c(1, -1)), "log10_snr_range")
   expect_error(runSimulationStudy_ErrorProcess2D(1, patience = 0), "patience")
 })

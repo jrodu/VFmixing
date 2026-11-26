@@ -44,7 +44,7 @@ saveRDS(results, file.path(out_dir, "collinearity2d_results_all.rds"))
 
 # Example summary: mean of each metric by error level, complexity and variant (to study
 # theta, model the metrics in results against results$theta instead)
-metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_sd", "n_true_regions", "theta"))
+metric_cols = setdiff(names(results)[vapply(results, is.numeric, logical(1))], c("seed", "error_snr", "n_true_regions", "theta"))
 summary_table = aggregate(results[, metric_cols], by = results[, c("error_level", "complexity", "variant")], FUN = mean, na.rm = TRUE)
 print(summary_table)
 
