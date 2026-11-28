@@ -157,14 +157,27 @@ blockDiagDense = function(blocks){
 
 # pinv(A) %*% B for a symmetric positive semi-definite A. Uses a Cholesky solve
 # when A is comfortably well conditioned, which gives the same answer as the
-# pseudo-inverse; otherwise falls back to pracma::pinv() exactly as before.
+# pseudo-inverse; otherwise falls back to pracma::pinv().
+#
+# A is first scaled to unit diagonal, D A D with D = diag(A)^(-1/2), and the
+# conditioning is judged on that. Much of A's spread comes from the scales of
+# its coefficients (slopes next to values, regions of different lengths), and
+# the scaling removes it. Without it, nearly collinear vector fields pushed A
+# past the check, and pinv() dropped exactly the direction that tells the
+# trajectories apart: from the estimate and from its covariance.
 psdSolve = function(A, B){
-  ch = tryCatch(chol(A), error = function(e){NULL})
-  if(!is.null(ch)){
-    dg = diag(ch)
-    # diag(chol)^2 tracks the eigenvalue spread; require condition number below ~1e12
-    if(min(dg) > 1e-6*max(dg)){
-      return(backsolve(ch, forwardsolve(t(ch), B)))
+  a = diag(A)
+  if(all(is.finite(a)) && all(a > 0)){
+    s = 1/sqrt(a)
+    ch = tryCatch(chol(A*outer(s, s)), error = function(e){NULL})
+    if(!is.null(ch)){
+      dg = diag(ch)
+      # diag(chol)^2 tracks the eigenvalue spread; require condition number below
+      # ~1e16, so only a matrix singular in double precision goes to pinv().
+      # (Vector fields 0.25 degrees apart give about 1e13 after scaling.)
+      if(min(dg) > 1e-8*max(dg)){
+        return(s*backsolve(ch, forwardsolve(t(ch), s*B)))
+      }
     }
   }
   pracma::pinv(A) %*% B
